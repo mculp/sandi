@@ -1,0 +1,8 @@
+# sandi holds itself to its own rules.
+inherit_from: config/sandi.yml
+
+AllCops:
+  TargetRubyVersion: 3.3
+  Include:
+    - exe/sandi
+    - lib/**/*.rb
