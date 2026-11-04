@@ -1,0 +1,10 @@
+{
+  "offenses": {
+    "counter": "RuboCop 1.87.0, the Metrics cops at the limits in .rubocop.yml, counting code lines",
+    "counts": {}
+  },
+  "rule 4": {
+    "counter": "distinct constants a script calls methods on outside any def, read with Prism; limit 1",
+    "counts": {}
+  }
+}
