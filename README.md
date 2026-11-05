@@ -65,7 +65,7 @@ Turn guidelines on by name in `.sandi.yml`:
 
 ```yaml
 guidelines:
-  - WhatComment       # a comment that says what the code does, rather than why
+  - WhatComment       # a comment inside a method that only says what the lines after it do
   - StaleComment      # a comment that the code under it contradicts
   - AskForWhat        # a method that tells another object how to do a job, step by step
   - Demeter           # a method that reaches through an object to that object's collaborators
@@ -101,9 +101,9 @@ answer until its text or code, the question or the model changes. A method that 
 the same tree asks nothing and counts the same, and CI can check guidelines without a key once every answer is
 recorded.
 
-None of the questions has been calibrated against Jev yet: they were written without an OpenRouter key to ask Jev
-about examples on each side of the line, so treat the first counts as a draft. [GUIDELINES.md](GUIDELINES.md) says
-what calibrating takes.
+WhatComment and StaleComment were calibrated against Jev on labeled examples and on sandi's own comments, as
+[GUIDELINES.md](GUIDELINES.md) describes. The six method questions haven't been calibrated yet, so treat their first
+counts as a draft.
 
 Without a key, and with some answer not yet recorded, sandi says so and leaves the baseline's guideline counts as they
 are. It doesn't fail the run, and it doesn't count what it didn't judge. A key that OpenRouter refuses, or an answer
