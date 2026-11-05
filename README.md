@@ -64,14 +64,14 @@ Turn guidelines on by name in `.sandi.yml`:
 
 ```yaml
 guidelines:
-  - WhatComment   # a comment that says what the code does, rather than why
+  - WhatComment   # a comment inside a method that only says what the lines after it do
   - StaleComment  # a comment that the code under it contradicts
 ```
 
 Each is asked about every comment written for a reader: a comment just above a `class`, `module` or `def`, and a
 comment on its own lines inside a method, each sent with the code it is about. Shebangs, magic comments, `rubocop:`
 directives and comments after code on the same line are skipped. The questions are in `config/guidelines.yml`, and
-[GUIDELINES.md](GUIDELINES.md) lists the guidelines still to come.
+[GUIDELINES.md](GUIDELINES.md) says how they were calibrated against Jev and lists the guidelines still to come.
 
 Jev answers with the probability that the answer is yes. A yes of 0.7 or more counts against the comment's file, in
 the same baseline and ratchet as the rules. When a count rises, sandi names the comments behind it, and it says what

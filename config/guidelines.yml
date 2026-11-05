@@ -7,20 +7,23 @@
 # project turns guidelines on by name in its .sandi.yml.
 #
 # Each question is phrased so that yes is the finding, and its criteria say where yes ends. Changing a question's
-# words changes every answer's key, so the next run asks Jev again.
+# words changes every answer's key, so the next run asks Jev again. These words were calibrated against Jev on
+# labeled examples, as GUIDELINES.md describes, so calibrate again before changing them.
 
-# Practical Object-Oriented Design in Ruby, chapter 2. A comment that says what a bit of code does is a method waiting
-# to be extracted: name the method for what the comment says, and the name can't drift from the code the way the
-# comment can.
+# Practical Object-Oriented Design in Ruby, chapter 2: when a bit of code inside a method needs a comment, extract it
+# into a method named for what the comment says, and the name can't drift from the code the way the comment can. So
+# this counts only comments inside a method. One above a class, module or method describes it, and is a no.
 WhatComment:
-  instructions: Does `comment` only say what `code` does, rather than why?
+  instructions: Is `comment` a note inside a method in `code` that only says what the lines after it do?
   criteria:
     "true": >-
-      The comment says what the code does: it narrates a step, restates a line, or names what a block of code or a
-      method already does. A method with a good name could say the same thing, and the comment would not be needed.
+      The comment is a line inside a method in `code`, and it narrates a step or restates what the lines after it do.
+      Those lines could be extracted into a method named for what the comment says, and the comment would not be
+      needed.
     "false": >-
-      The comment says something the code cannot: why it is written this way, a constraint, a workaround, a decision,
-      a warning or a reference, or what the code means or stands for in the problem it solves.
+      The comment is not inside a method in `code`: it sits above a class, module or method and describes it. Or it
+      says something the code cannot: why the code is written this way, a constraint, a workaround, a decision, a
+      warning or a reference, or what the code means in the problem it solves.
 
 # Practical Object-Oriented Design in Ruby, chapter 2. Comments aren't executed, so they decay as the code changes
 # around them, and a comment that disagrees with the code misleads the readers who trust it.
@@ -32,4 +35,5 @@ StaleComment:
       differently, so a reader who trusts the comment is misled.
     "false": >-
       Everything the comment says about the code is true of it, or the comment says nothing the code could
-      contradict.
+      contradict. A method defined outside `code` may well do what the comment says, so a claim about one is not
+      contradicted. Ruby's own methods do what Ruby documents.

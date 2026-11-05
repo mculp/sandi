@@ -10,7 +10,7 @@ Each comes down to a judgment no parser can make, so sandi asks Jev, a decision 
 about a piece of code with a probability. A guideline is one yes/no question about one place in the code, phrased so
 that yes is the finding. A yes of 0.7 or more counts against the file in the same ratchet as the rules.
 
-This page lists the guidelines sandi has and the ones identified to build next.
+This page lists the guidelines sandi has, how they were calibrated, and the ones identified to build next.
 
 ## What makes a guideline work
 
@@ -28,24 +28,57 @@ Jev is built for fast, narrow judgments, the kind a reader makes in a second wit
   a 5-line method and a 100-line class are small enough to send whole, so code that keeps the rules gets better
   judgments.
 - **Calibrated before it counts.** A question's wording decides its answers. Before a guideline goes into
-  `config/guidelines.yml`, ask it about a few examples on each side of the line and check that 0.7 separates them.
-  Changing the wording later means every recorded answer to that question is asked again.
+  `config/guidelines.yml`, ask it about labeled examples on each side of the line and about a real codebase, and
+  check that 0.7 separates them. Made-up examples alone miss things: only sandi's own code showed that WhatComment's
+  first wording counted doc comments too. Changing the wording later means every recorded answer to that question is
+  asked again.
 
 ## The guidelines sandi has
 
 They read a comment written for a reader, sent with the code it is about: the class, module or def it documents, or
 the method it sits in.
 
-**WhatComment**: *Does the comment only say what the code does, rather than why?*
-Practical Object-Oriented Design in Ruby (POODR), chapter 2. A comment that narrates a bit of code is a method waiting
-to be extracted. Name the method for what the comment says, and the name can't drift from the code the way a comment
-can. Comments that give a reason, a constraint or a decision are things code can't say, and they stay.
+**WhatComment**: *Is the comment a note inside a method that only says what the lines after it do?*
+Practical Object-Oriented Design in Ruby (POODR), chapter 2. A comment that narrates a bit of code inside a method is a
+method waiting to be extracted. Name the method for what the comment says, and the name can't drift from the code the
+way a comment can. Comments that give a reason, a constraint or a decision are things code can't say, and they stay. A
+comment above a class or method describes it rather than narrating it, so it doesn't count.
 
 **StaleComment**: *Does the code contradict something the comment says about it?*
 POODR, chapter 2. Comments aren't executed, so they decay as code changes around them, and a comment that disagrees
-with the code misleads the readers who trust it.
+with the code misleads the readers who trust it. A claim about a method defined elsewhere doesn't count, since Jev
+can't see that method.
 
-Both questions follow TypeSafe's guidance for writing them, but neither has been calibrated against Jev yet.
+## Calibration
+
+Both questions were calibrated on November 4, 2026, against `typesafe/jev-1.14`. OpenRouter answered it with the
+snapshot `typesafe/jev-1.14-20261014`, the same one `jev-latest` pointed to. Each question was asked three times about
+49 labeled examples: comments inside methods that narrate or explain, comments above definitions, and the same code
+under a comment that is true of it and one the code contradicts. They were also asked about sandi's own comments.
+
+| | Caught | Missed | Correct no | False yes | Lowest labeled yes | Highest labeled no |
+| --- | --- | --- | --- | --- | --- | --- |
+| WhatComment | 9 | 0 | 39 | 0 | 0.82 | 0.38 |
+| StaleComment | 11 | 2 | 36 | 0 | 0.37 | 0.47 |
+
+What the calibration showed:
+
+- **WhatComment's first wording counted doc comments too.** Its criteria included naming what a method already does,
+  and 13 of the 52 comments in sandi's code and tests came back yes, every one of them above a `def` or `class`.
+  POODR's advice is about a comment inside a method, so the question now asks about those, and no comment above a
+  definition, made up or in sandi, reached 0.6.
+- **StaleComment misses what takes more than a glance.** A retry limit that only counting through a recursion can
+  check scored 0.37, and a wrong method name that reads as a description, "Calls normalize" above a call to
+  `sanitize!`, scored 0.54. Jev counts poorly, as above.
+- **StaleComment also counts a comment a reader could misread.** In `lib/sandi/ratchet.rb`, "0 when no count rose
+  above the baseline, 1 when one did" sits above a method that prints and returns, and it scored 0.67 to 0.79. "The
+  exit status: 0 when …" scored 0.16. Saying what a comment describes clears it, and the comment is better for it.
+- **Jev is steady but not fixed.** Asked the same question again, its answer usually moved by a hundredth or two, and
+  by 0.22 at most, so a borderline answer can land on either side of 0.7. Recording each answer is what keeps a count
+  from moving on its own.
+
+With both guidelines on, sandi asks 78 questions about the 39 comments in its `lib/` and `exe/`, in 2.4 seconds for
+about a tenth of a cent, and counts none. The `ratchet.rb` comment is the closest, recorded at 0.68.
 
 ## Guidelines to come
 
@@ -138,8 +171,8 @@ Some of her advice can be counted, and belongs with the rules:
 
 ## What to build next
 
-1. Calibrate WhatComment and StaleComment against Jev on comments from a real codebase, and turn them on for sandi
-   itself.
+1. Turn WhatComment and StaleComment on for sandi itself, and commit its answers.
 2. Add methods as a place to read, with AskForWhat, Demeter, InjectDependency, TypeSwitch, FlagParameter and NullCheck
-   first. They come straight from the books and their findings are concrete.
+   first. They come straight from the books and their findings are concrete. Calibrate each one the way the comment
+   guidelines were.
 3. Add classes, then tests.
