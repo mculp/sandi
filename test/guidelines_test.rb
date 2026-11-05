@@ -14,7 +14,6 @@ class GuidelinesTest < SandiCase
     end
   RUBY
 
-  def guidelines(*names) = write(".sandi.yml", "guidelines:\n#{names.map { |name| "  - #{name}\n" }.join}")
   def judgments = JSON.parse(File.read(File.join(@root, ".sandi-judgments.json")))
   def asked = @jev.requests.map { |request| request.body.dig("state", "comment") }
 

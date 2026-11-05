@@ -12,7 +12,8 @@ guidelines if you ask for them.
    `def`.
 
 **Guidelines** are the rest of what she says about code: judgment calls no parser can make, such as whether a comment
-says what the code does rather than why. sandi puts each one as a yes/no question to
+says what the code does rather than why, or whether a method reaches through one object to another. sandi puts each
+one as a yes/no question to
 [Jev](https://docs.typesafe.ai/concepts/system-one), TypeSafe's decision model, through OpenRouter. Guidelines are off
 unless a project turns them on. See [Guidelines](#guidelines).
 
@@ -64,30 +65,45 @@ Turn guidelines on by name in `.sandi.yml`:
 
 ```yaml
 guidelines:
-  - WhatComment   # a comment that says what the code does, rather than why
-  - StaleComment  # a comment that the code under it contradicts
+  - WhatComment       # a comment that says what the code does, rather than why
+  - StaleComment      # a comment that the code under it contradicts
+  - AskForWhat        # a method that tells another object how to do a job, step by step
+  - Demeter           # a method that reaches through an object to that object's collaborators
+  - InjectDependency  # a method that creates an object of a class it could be given instead
+  - TypeSwitch        # a method that decides what to do by checking what kind of object it has
+  - FlagParameter     # a method with a parameter that chooses which of its behaviors runs
+  - NullCheck         # a method that checks for nil where an object standing for nothing could answer
 ```
 
-Each is asked about every comment written for a reader: a comment just above a `class`, `module` or `def`, and a
-comment on its own lines inside a method, each sent with the code it is about. Shebangs, magic comments, `rubocop:`
-directives and comments after code on the same line are skipped. The questions are in `config/guidelines.yml`, and
-[GUIDELINES.md](GUIDELINES.md) lists the guidelines still to come.
+Each guideline reads one kind of place. WhatComment and StaleComment are asked about every comment written for a
+reader: a comment just above a `class`, `module` or `def`, and a comment on its own lines inside a method, each sent
+with the code it is about. Shebangs, magic comments, `rubocop:` directives and comments after code on the same line are
+skipped. The other six are asked about every `def`, sent with its source, whether it's in a class or module, in
+`class << self`, in a block or at the top of a script. The questions are in `config/guidelines.yml`, and
+[GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still to come.
 
-Jev answers with the probability that the answer is yes. A yes of 0.7 or more counts against the comment's file, in
-the same baseline and ratchet as the rules. When a count rises, sandi names the comments behind it, and it says what
-asking cost:
+Jev answers with the probability that the answer is yes. A yes of 0.7 or more counts against the file the comment or
+method is in, in the same baseline and ratchet as the rules. When a count rises, sandi names what's behind it, by the
+comment's first line or the method's `def`, and it says what asking cost:
 
 ```text
-guidelines: 2 (StaleComment 1, WhatComment 1) in 1 of 1 files
+guidelines: 3 (Demeter 1, StaleComment 1, WhatComment 1) in 1 of 1 files
   lib/cart.rb:5 StaleComment 0.81
   lib/cart.rb:7 WhatComment 0.93
-asked Jev (typesafe/jev-1.14) through OpenRouter 6 of 6 questions in 0.4s: 360 input tokens, about $0.00002
+  lib/cart.rb:9 Demeter 0.88
+asked Jev (typesafe/jev-1.14) through OpenRouter 9 of 9 questions in 0.5s: 600 input tokens, about $0.00003
 ```
 
-Asking needs an OpenRouter key in `OPENROUTER_API_KEY`. Jev's answers go in `.sandi-judgments.json`, which you commit
-beside the baseline. A model asked the same borderline question twice can answer differently, so sandi asks about a
-comment once and reuses the answer until the comment, its code, the question or the model changes. A rerun on the same
-tree asks nothing and counts the same, and CI can check guidelines without a key once every answer is recorded.
+Every question about one comment or method goes to Jev in one request. Asking needs an OpenRouter key in
+`OPENROUTER_API_KEY`. Jev's answers go in `.sandi-judgments.json`, which you commit beside the baseline. A model asked
+the same borderline question twice can answer differently, so sandi asks about a comment or method once and reuses the
+answer until its text or code, the question or the model changes. A method that only moves keeps its answer. A rerun on
+the same tree asks nothing and counts the same, and CI can check guidelines without a key once every answer is
+recorded.
+
+None of the questions has been calibrated against Jev yet: they were written without an OpenRouter key to ask Jev
+about examples on each side of the line, so treat the first counts as a draft. [GUIDELINES.md](GUIDELINES.md) says
+what calibrating takes.
 
 Without a key, and with some answer not yet recorded, sandi says so and leaves the baseline's guideline counts as they
 are. It doesn't fail the run, and it doesn't count what it didn't judge. A key that OpenRouter refuses, or an answer

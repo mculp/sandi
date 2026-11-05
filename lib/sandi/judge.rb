@@ -2,8 +2,8 @@
 
 module Sandi
   # Answers each judgment from the record when it can, or else from Jev, recording what Jev says so that the same tree
-  # is judged the same way next time. Each comment is one request with every question about it, and a few requests are
-  # in flight at once, since each one is a round trip.
+  # is judged the same way next time. Each place, a comment or a method, is one request with every question about it,
+  # and a few requests are in flight at once, since each one is a round trip.
   class Judge
     AT_ONCE = 8
 
@@ -20,7 +20,7 @@ module Sandi
     # Each judgment with its noul. What Jev answered is saved even when a later request fails, so a rerun picks up
     # where this one stopped.
     def nouls(judgments)
-      timed { unrecorded(judgments).group_by(&:comment).each_slice(AT_ONCE) { |comments| ask(comments) } }
+      timed { unrecorded(judgments).group_by(&:place).each_slice(AT_ONCE) { |places| ask(places) } }
       judgments.to_h { |judgment| [judgment, @judgments.noul(key(judgment))] }
     ensure
       @judgments.save(judgments.map { |judgment| key(judgment) })
@@ -42,8 +42,8 @@ module Sandi
     def unrecorded(judgments) = judgments.reject { |judgment| @judgments.noul(key(judgment)) }
     def key(judgment) = judgment.key(@jev.model)
 
-    def ask(comments)
-      threads = comments.map { |_comment, judgments| Thread.new { quietly { [judgments, ask_about(judgments)] } } }
+    def ask(places)
+      threads = places.map { |_place, judgments| Thread.new { quietly { [judgments, ask_about(judgments)] } } }
       threads.each { |thread| record(*thread.value) }
     end
 

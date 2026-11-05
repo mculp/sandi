@@ -44,6 +44,9 @@ class SandiCase < Minitest::Test
 
   def script(path, body) = write(path, "#!/usr/bin/env ruby\n#{body}")
 
+  # A .sandi.yml that turns on the guidelines named.
+  def guidelines(*names) = write(".sandi.yml", "guidelines:\n#{names.map { |name| "  - #{name}\n" }.join}")
+
   # A Jev on localhost that answers each question with what the block gives for the state and the question's name. The
   # first answers can be HTTP errors instead, one per status given.
   def jev(statuses: [], &noul)

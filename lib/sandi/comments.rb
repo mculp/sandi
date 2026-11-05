@@ -7,7 +7,10 @@ module Sandi
   # module or def is about that definition, and a comment on its own lines in a method is about the method. Shebangs,
   # magic comments and rubocop: directives are written for tools, and a comment after code on its line is left alone.
   class Comments
-    Comment = Data.define(:file, :line, :text, :code)
+    Comment = Data.define(:file, :line, :text, :code) do
+      # What Jev reads to answer a question about the comment.
+      def state = {"comment" => text, "code" => code}
+    end
     DEFINITIONS = %i[class_node module_node singleton_class_node def_node].freeze
     DIRECTIVE = /\A#(!|\s*rubocop:)/
     # The code sent with a comment stops after a class's worth of lines, so code within the first rule is sent whole.
