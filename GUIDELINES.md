@@ -71,14 +71,19 @@ What the calibration showed:
   check scored 0.37, and a wrong method name that reads as a description, "Calls normalize" above a call to
   `sanitize!`, scored 0.54. Jev counts poorly, as above.
 - **StaleComment also counts a comment a reader could misread.** In `lib/sandi/ratchet.rb`, "0 when no count rose
-  above the baseline, 1 when one did" sits above a method that prints and returns, and it scored 0.67 to 0.79. "The
-  exit status: 0 when …" scored 0.16. Saying what a comment describes clears it, and the comment is better for it.
+  above the baseline, 1 when one did" sat above a method that prints and returns, and it scored 0.67 to 0.79. Turning
+  guidelines on for sandi's own code recorded it at 0.68 in one run and 0.77 in the next, which failed that run. The
+  comment now begins "The exit status:", which says what the numbers are, and it scores 0.15.
 - **Jev is steady but not fixed.** Asked the same question again, its answer usually moved by a hundredth or two, and
   by 0.22 at most, so a borderline answer can land on either side of 0.7. Recording each answer is what keeps a count
-  from moving on its own.
+  from moving on its own, and the answer recorded first is the one that counts. A comment that scores near 0.7 is
+  reworded, not asked about again until it passes.
 
-With both guidelines on, sandi asks 78 questions about the 39 comments in its `lib/` and `exe/`, in 2.4 seconds for
-about a tenth of a cent, and counts none. The `ratchet.rb` comment is the closest, recorded at 0.68.
+sandi runs both guidelines on its own comments, from the answers committed in `.sandi-judgments.json`: 78 questions
+about the 39 comments in its `lib/` and `exe/`, which took 1.9 seconds and about a tenth of a cent to ask. None counts,
+and the highest is 0.59, WhatComment on the comment above `counts_against` in `lib/sandi/judgment.rb`. CI replays the
+answers and needs no key, so a comment that changes shows as not judged until someone records its answers with
+`sandi --update`.
 
 ## Guidelines to come
 
@@ -171,7 +176,8 @@ Some of her advice can be counted, and belongs with the rules:
 
 ## What to build next
 
-1. Turn WhatComment and StaleComment on for sandi itself, and commit its answers.
+1. Read the comments above a constant, which sandi skips now: 9 of the 48 in its own code, among them the one above
+   `Judgment = Data.define`.
 2. Add methods as a place to read, with AskForWhat, Demeter, InjectDependency, TypeSwitch, FlagParameter and NullCheck
    first. They come straight from the books and their findings are concrete. Calibrate each one the way the comment
    guidelines were.

@@ -106,3 +106,7 @@ bundle exec exe/sandi    # sandi holds itself to its own rules
 
 The tests run against a fake `rubocop` on the `PATH` and a fake Jev on localhost, which `SANDI_JEV_URL` points sandi
 at, so they need no network, no key and no real RuboCop.
+
+sandi holds its own comments to its guidelines too, from the answers committed in `.sandi-judgments.json`, so
+`bundle exec exe/sandi` needs no key. After changing a comment, or the code it is about, run
+`bundle exec exe/sandi --update` with `OPENROUTER_API_KEY` set to record the answers that change needs, and commit them.
