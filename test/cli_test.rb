@@ -1,68 +1,9 @@
 # frozen_string_literal: true
 
-require "fileutils"
-require "json"
-require "minitest/autorun"
-require "stringio"
-require "tmpdir"
-require_relative "../lib/sandi"
+require_relative "test_helper"
 
-# sandi against a tree in a temporary directory and a `rubocop` that reports what each test says, so that these
-# tests need no gems. The ratchet is what keeps the design limits from slipping back, so what it lets through matters.
-class SandiTest < Minitest::Test
-  def setup
-    @root = Dir.mktmpdir("sandi-")
-    @tools = File.join(@root, ".tools")
-    FileUtils.mkdir_p(@tools)
-  end
-
-  def teardown = FileUtils.remove_entry(@root)
-
-  # What RuboCop will report: the cops that fired in each file it inspected, one name per offense. It only reports
-  # files it read, so they exist.
-  def rubocop_reports(offenses)
-    offenses.each_key { |path| write(path, "") unless File.exist?(File.join(@root, path)) }
-    files = offenses.map { |path, cops| {"path" => path, "offenses" => cops.map { |cop| {"cop_name" => "Metrics/#{cop}"} }} }
-    report = JSON.generate("metadata" => {"rubocop_version" => "1.87.0"}, "files" => files)
-    install("rubocop", "printf '%s' '#{report}'\nexit #{offenses.values.flatten.empty? ? 0 : 1}")
-  end
-
-  def install(name, script)
-    File.write(File.join(@tools, name), "#!/bin/sh\n#{script}\n")
-    File.chmod(0o755, File.join(@tools, name))
-  end
-
-  def write(path, body)
-    FileUtils.mkdir_p(File.dirname(File.join(@root, path)))
-    File.write(File.join(@root, path), body)
-  end
-
-  def script(path, body) = write(path, "#!/usr/bin/env ruby\n#{body}")
-
-  # The exit status of `sandi *argv` with only the fake tools on the PATH. Leaves what it said in @out and @err.
-  def sandi(*argv)
-    out, err = StringIO.new, StringIO.new
-    status = with_path(@tools) { Sandi::CLI.new(argv, root: @root, out: out, err: err).call }
-    @out, @err = out.string, err.string
-    status
-  end
-
-  def with_path(directory)
-    saved = ENV["PATH"]
-    ENV["PATH"] = directory
-    yield
-  ensure
-    ENV["PATH"] = saved
-  end
-
-  # A baseline taken from a tree that looks like this.
-  def record(offenses)
-    rubocop_reports(offenses)
-    assert_equal 0, sandi("--update", "--allow-increase")
-  end
-
-  def baseline = File.read(File.join(@root, ".sandi-baseline.json"))
-
+# Sandi's four rules, counted by RuboCop and Prism and held against the baseline.
+class SandiTest < SandiCase
   def test_a_tree_no_worse_than_the_baseline_passes
     record("lib/a.rb" => %w[MethodLength MethodLength], "lib/b.rb" => [])
     assert_equal 0, sandi

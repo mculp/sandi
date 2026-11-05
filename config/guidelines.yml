@@ -1,0 +1,35 @@
+# Sandi Metz's guidelines: what she says about code that a parser can't check, put to Jev, TypeSafe's decision model,
+# as yes/no questions. Each is asked about one comment, with the code it is about, as the state
+#
+#   {"comment": "the comment's text", "code": "the class, module or def it documents, or the method it is in"}
+#
+# and Jev answers with a noul, the probability that the answer is yes. A yes counts against the comment's file. A
+# project turns guidelines on by name in its .sandi.yml.
+#
+# Each question is phrased so that yes is the finding, and its criteria say where yes ends. Changing a question's
+# words changes every answer's key, so the next run asks Jev again.
+
+# Practical Object-Oriented Design in Ruby, chapter 2. A comment that says what a bit of code does is a method waiting
+# to be extracted: name the method for what the comment says, and the name can't drift from the code the way the
+# comment can.
+WhatComment:
+  instructions: Does `comment` only say what `code` does, rather than why?
+  criteria:
+    "true": >-
+      The comment says what the code does: it narrates a step, restates a line, or names what a block of code or a
+      method already does. A method with a good name could say the same thing, and the comment would not be needed.
+    "false": >-
+      The comment says something the code cannot: why it is written this way, a constraint, a workaround, a decision,
+      a warning or a reference, or what the code means or stands for in the problem it solves.
+
+# Practical Object-Oriented Design in Ruby, chapter 2. Comments aren't executed, so they decay as the code changes
+# around them, and a comment that disagrees with the code misleads the readers who trust it.
+StaleComment:
+  instructions: Does `code` contradict something `comment` says about it?
+  criteria:
+    "true": >-
+      The comment states a behavior, value, name, parameter, return value, order or limit that the code does
+      differently, so a reader who trusts the comment is misled.
+    "false": >-
+      Everything the comment says about the code is true of it, or the comment says nothing the code could
+      contradict.
