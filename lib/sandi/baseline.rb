@@ -14,6 +14,8 @@ module Sandi
 
     def write(counters)
       File.write(@path, "#{JSON.pretty_generate(counters.to_h { |counter| [counter.name, section(counter)] })}\n")
+    rescue SystemCallError => error
+      raise Error, "sandi could not write the baseline: #{error.message}"
     end
 
     private

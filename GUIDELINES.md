@@ -79,11 +79,11 @@ What the calibration showed:
   from moving on its own, and the answer recorded first is the one that counts. A comment that scores near 0.7 is
   reworded, not asked about again until it passes.
 
-sandi runs both guidelines on its own comments, from the answers committed in `.sandi-judgments.json`: 78 questions
-about the 39 comments in its `lib/` and `exe/`, which took 1.9 seconds and about a tenth of a cent to ask. None counts,
-and the highest is 0.59, WhatComment on the comment above `counts_against` in `lib/sandi/judgment.rb`. CI replays the
-answers and needs no key, so a comment that changes shows as not judged until someone records its answers with
-`sandi --update`.
+sandi runs both guidelines on its own comments, from the answers committed in `.sandi-judgments.json`: 92 questions
+about the 46 comments in its `lib/` and `exe/`. The first 78 took 1.9 seconds and about a tenth of a cent to ask. None
+counts, and the highest is 0.59, WhatComment on the comment above `counts_against` in `lib/sandi/judgment.rb`. CI
+replays the answers and needs no key, so a comment that changes shows as not judged until someone records its answers
+with `sandi --update`.
 
 ## Guidelines to come
 
@@ -176,7 +176,7 @@ Some of her advice can be counted, and belongs with the rules:
 
 ## What to build next
 
-1. Read the comments above a constant, which sandi skips now: 9 of the 48 in its own code, among them the one above
+1. Read the comments above a constant, which sandi skips now: 9 of the 55 in its own code, among them the one above
    `Judgment = Data.define`.
 2. Add methods as a place to read, with AskForWhat, Demeter, InjectDependency, TypeSwitch, FlagParameter and NullCheck
    first. They come straight from the books and their findings are concrete. Calibrate each one the way the comment

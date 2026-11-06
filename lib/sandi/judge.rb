@@ -17,13 +17,13 @@ module Sandi
     # True when the record holds every answer or Jev can be asked for the rest.
     def able?(judgments) = @jev.ready? || unrecorded(judgments).empty?
 
-    # Each judgment with its noul. What Jev answered is saved even when a later request fails, so a rerun picks up
-    # where this one stopped.
+    # Each judgment with its noul. What Jev answered is saved even when a request fails, so a rerun picks up where this
+    # one stopped.
     def nouls(judgments)
       timed { unrecorded(judgments).group_by(&:comment).each_slice(AT_ONCE) { |comments| ask(comments) } }
       judgments.to_h { |judgment| [judgment, @judgments.noul(key(judgment))] }
     ensure
-      @judgments.save(judgments.map { |judgment| key(judgment) })
+      save(judgments, failing: $!)
     end
 
     # What asking took, the way the rules' counters say what they counted.
@@ -40,11 +40,24 @@ module Sandi
     private
 
     def unrecorded(judgments) = judgments.reject { |judgment| @judgments.noul(key(judgment)) }
-    def key(judgment) = judgment.key(@jev.model)
+    def key(judgment) = keys[judgment] ||= judgment.key(@jev.model)
 
+    # By identity, so that looking one up doesn't hash the comment and its code again.
+    def keys = @keys ||= {}.compare_by_identity
+
+    # Every request asked at once is waited for, and what Jev answered is recorded, before the first failure is raised.
     def ask(comments)
       threads = comments.map { |_comment, judgments| Thread.new { quietly { [judgments, ask_about(judgments)] } } }
-      threads.each { |thread| record(*thread.value) }
+      failures = threads.filter_map { |thread| failure { record(*thread.value) } }
+      raise failures.first if failures.any?
+    end
+
+    # The error the block raised, if it raised one.
+    def failure
+      yield
+      nil
+    rescue Error => error
+      error
     end
 
     def ask_about(judgments) = @jev.nouls(judgments.first.state, questions(judgments))
@@ -54,6 +67,14 @@ module Sandi
       judgments.each { |judgment| @judgments.record(key(judgment), nouls.fetch(judgment.name)) }
       @asked += judgments.size
       @tokens += tokens
+    end
+
+    # A failure to save is raised, unless asking failed first: raised then, it would replace that failure, the one to
+    # report.
+    def save(judgments, failing:)
+      @judgments.save(judgments.map { |judgment| key(judgment) })
+    rescue Error
+      raise unless failing
     end
 
     # A thread's error reaches whoever waits for it, so it needn't be printed as well.

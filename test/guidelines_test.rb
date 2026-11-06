@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "minitest/mock"
 require_relative "test_helper"
 
 # Sandi's guidelines: comments put to Jev, here a fake one on localhost, and counted in the same ratchet as the rules.
@@ -24,6 +25,21 @@ class GuidelinesTest < SandiCase
     yes ? jev_says_yes_to("Adds one to the count.") : jev_says_yes_to
     write("lib/counter.rb", COUNTER)
     rubocop_reports("lib/counter.rb" => [])
+  end
+
+  # A file of methods, each under a comment that says what it returns: "Returns 1." and so on.
+  def numbers(count)
+    methods = (1..count).map { |number| "# Returns #{number}.\ndef number#{number} = #{number}\n" }
+    write("lib/many.rb", methods.join("\n"))
+    rubocop_reports("lib/many.rb" => [])
+  end
+
+  # A method of `length` lines with the comment "Totals the cart." on its own line, the one at `at`.
+  def long_method(length:, at:)
+    lines = Array.new(length - 2) { |index| "  total += #{index + 1}\n" }
+    lines[at - 2] = "  # Totals the cart.\n"
+    write("lib/long.rb", ["def long\n", *lines, "end\n"].join)
+    rubocop_reports("lib/long.rb" => [])
   end
 
   def test_guidelines_are_off_unless_the_project_names_them
@@ -110,6 +126,59 @@ class GuidelinesTest < SandiCase
     assert_equal ["A count of what a file breaks.", "Adds one to the total.", "Bump the total."], asked.sort
   end
 
+  def test_a_directive_beside_a_comment_is_left_out_of_it_but_does_not_separate_it_from_its_def
+    guidelines("WhatComment")
+    jev_says_yes_to("Sums the cart, before tax.")
+    write("lib/cart.rb", <<~RUBY)
+      class Cart
+        # rubocop:disable Metrics/AbcSize
+        # Sums the cart, before tax.
+        # rubocop:disable Metrics/MethodLength
+        def total = @items.sum(&:price)
+
+        # rubocop:disable Metrics/AbcSize
+        def count = @items.size
+      end
+    RUBY
+    rubocop_reports("lib/cart.rb" => [])
+    assert_equal 1, sandi
+    state = {"comment" => "Sums the cart, before tax.", "code" => "  def total = @items.sum(&:price)\n"}
+    assert_equal [state], @jev.requests.map { |request| request.body["state"] }
+    assert_includes @out, "lib/cart.rb:3 WhatComment 0.9"
+  end
+
+  def test_a_comment_deep_in_a_long_method_is_asked_with_the_lines_around_it
+    guidelines("WhatComment")
+    jev_says_yes_to("Totals the cart.")
+    long_method(length: 153, at: 122)
+    sandi
+    code = @jev.requests.first.body.dig("state", "code")
+    assert_includes code, "# Totals the cart."
+    assert_equal Sandi::Comments::LINES, code.lines.size
+  end
+
+  def test_a_comment_near_the_end_of_a_long_method_is_asked_with_its_last_lines
+    guidelines("WhatComment")
+    jev_says_yes_to("Totals the cart.")
+    long_method(length: 153, at: 150)
+    sandi
+    code = @jev.requests.first.body.dig("state", "code")
+    assert_includes code, "# Totals the cart."
+    assert_equal "end\n", code.lines.last
+    assert_equal Sandi::Comments::LINES, code.lines.size
+  end
+
+  def test_a_comment_near_the_top_of_a_long_method_is_asked_with_its_first_lines
+    guidelines("WhatComment")
+    jev_says_yes_to("Totals the cart.")
+    long_method(length: 153, at: 5)
+    sandi
+    code = @jev.requests.first.body.dig("state", "code")
+    assert_equal "def long\n", code.lines.first
+    assert_includes code, "# Totals the cart."
+    assert_equal Sandi::Comments::LINES, code.lines.size
+  end
+
   def test_jev_is_asked_with_the_key_the_pinned_model_and_the_comment_with_the_definition_it_documents
     counter(yes: false)
     sandi
@@ -151,21 +220,52 @@ class GuidelinesTest < SandiCase
   def test_more_comments_than_are_asked_at_once_are_all_asked
     guidelines("WhatComment")
     jev { 0.9 }
-    write("lib/many.rb", (1..20).map { |number| "# Returns #{number}.\ndef number#{number} = #{number}\n" }.join("\n"))
-    rubocop_reports("lib/many.rb" => [])
+    numbers(20)
     sandi
     assert_equal 20, @jev.requests.size
     assert_includes @out, "guidelines: 20 (WhatComment 20) in 1 of 1 files"
   end
 
+  def test_the_key_of_each_judgment_is_worked_out_once
+    guidelines("WhatComment")
+    jev { 0.1 }
+    numbers(3)
+    digests = 0
+    real = Digest::SHA256.method(:hexdigest)
+    Digest::SHA256.stub(:hexdigest, ->(text) { digests += 1; real.call(text) }) { sandi }
+    assert_equal 3, digests
+  end
+
   def test_answers_jev_gave_before_it_failed_are_kept_for_the_next_run
     guidelines("WhatComment")
     jev(statuses: [200] * Sandi::Judge::AT_ONCE + [401]) { 0.1 }
-    count = Sandi::Judge::AT_ONCE + 1
-    write("lib/many.rb", (1..count).map { |number| "# Returns #{number}.\ndef number#{number} = #{number}\n" }.join("\n"))
-    rubocop_reports("lib/many.rb" => [])
+    numbers(Sandi::Judge::AT_ONCE + 1)
     assert_equal 2, sandi
     assert_equal Sandi::Judge::AT_ONCE, judgments.size
+  end
+
+  def test_answers_to_the_other_requests_asked_at_once_are_kept_when_one_fails
+    guidelines("WhatComment")
+    jev { |state, _name| state["comment"] == "Returns 2." ? nil : 0.1 }
+    numbers(3)
+    assert_equal 2, sandi
+    assert_equal 2, judgments.size
+  end
+
+  def test_answers_sandi_cannot_save_mean_it_could_not_count
+    counter(yes: false)
+    read_only(".sandi-judgments.json", "{}\n")
+    assert_equal 2, sandi
+    assert_includes @err, ".sandi-judgments.json"
+  end
+
+  def test_when_asking_fails_and_saving_fails_too_the_failure_to_ask_is_the_one_reported
+    guidelines("WhatComment")
+    jev { |state, _name| state["comment"] == "Returns 2." ? nil : 0.1 }
+    numbers(2)
+    read_only(".sandi-judgments.json", "{}\n")
+    assert_equal 2, sandi
+    assert_includes @err, "did not answer WhatComment"
   end
 
   def test_an_answer_without_a_noul_means_sandi_could_not_count
@@ -173,6 +273,33 @@ class GuidelinesTest < SandiCase
     jev { nil }
     assert_equal 2, sandi
     assert_includes @err, "did not answer WhatComment"
+  end
+
+  def test_a_noul_that_is_not_a_number_means_sandi_could_not_count
+    counter(yes: false)
+    jev { "0.9" }
+    assert_equal 2, sandi
+    assert_includes @err, "did not answer WhatComment"
+  end
+
+  def test_a_reply_that_is_not_a_json_object_means_sandi_could_not_count
+    counter(yes: false)
+    jev(replies: [nil]) { 0.1 }
+    assert_equal 2, sandi
+    assert_includes @err, "answered in a way sandi can't read"
+  end
+
+  def test_a_reply_that_is_not_http_means_sandi_could_not_count
+    counter(yes: false)
+    jev(statuses: ["???"]) { 0.1 }
+    assert_equal 2, sandi
+    assert_includes @err, "answered in a way sandi can't read"
+  end
+
+  def test_a_jev_url_without_a_path_is_asked_at_its_root
+    counter(yes: true)
+    assert_equal 1, sandi(url: @jev.url.delete_suffix("/api/v1/systemone"))
+    assert_includes @out, "guidelines: 1 (WhatComment 1) in 1 of 1 files"
   end
 
   def test_without_a_key_a_comment_not_yet_judged_leaves_the_baseline_as_it_is_and_says_why

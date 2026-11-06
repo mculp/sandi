@@ -19,6 +19,8 @@ module Sandi
     def save(keys)
       kept = (@prune ? recorded.slice(*keys) : recorded).sort.to_h
       File.write(@path, "#{JSON.pretty_generate(kept)}\n") unless kept == read
+    rescue SystemCallError => error
+      raise Error, "sandi could not save Jev's answers: #{error.message}"
     end
 
     private

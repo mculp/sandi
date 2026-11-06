@@ -26,8 +26,7 @@ module Sandi
     def judgments = @judgments ||= @comments.product(@guidelines).map { |pair| Judgment.new(*pair) }
     def yeses = @yeses ||= @judge.nouls(judgments).select { |_judgment, noul| noul >= YES }
 
-    def counts = "#{NAME}: #{tally.total} (#{kinds}) in #{tally.file_count} of #{@comments.map(&:file).uniq.size} files"
-    def kinds = tally.by_name.map { |guideline, count| "#{guideline} #{count}" }.join(", ")
+    def counts = "#{NAME}: #{tally.summary(@comments.map(&:file).uniq.size)}"
     def unjudged = "#{NAME}: not judged, so the baseline's counts stand: #{@judge.excuse(judgments)}"
 
     # Where the yeses are in a file whose count rose: no other tool can show them.

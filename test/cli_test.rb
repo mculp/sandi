@@ -145,6 +145,13 @@ class SandiTest < SandiCase
     assert_includes @err, "not valid JSON"
   end
 
+  def test_a_baseline_sandi_cannot_write_is_reported_rather_than_crashed_on
+    read_only(".sandi-baseline.json", "{}\n")
+    rubocop_reports("lib/a.rb" => [])
+    assert_equal 2, sandi("--update")
+    assert_includes @err, ".sandi-baseline.json"
+  end
+
   def test_allow_increase_without_update_is_misuse
     assert_equal 2, sandi("--allow-increase")
     assert_includes @err, "usage: sandi"

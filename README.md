@@ -70,7 +70,8 @@ guidelines:
 
 Each is asked about every comment written for a reader: a comment just above a `class`, `module` or `def`, and a
 comment on its own lines inside a method, each sent with the code it is about. Shebangs, magic comments, `rubocop:`
-directives and comments after code on the same line are skipped. The questions are in `config/guidelines.yml`, and
+directives and comments after code on the same line are skipped, though a directive between a comment and the
+definition under it doesn't separate them. The questions are in `config/guidelines.yml`, and
 [GUIDELINES.md](GUIDELINES.md) says how they were calibrated against Jev and lists the guidelines still to come.
 
 Jev answers with the probability that the answer is yes. A yes of 0.7 or more counts against the comment's file, in
@@ -90,8 +91,9 @@ comment once and reuses the answer until the comment, its code, the question or 
 tree asks nothing and counts the same, and CI can check guidelines without a key once every answer is recorded.
 
 Without a key, and with some answer not yet recorded, sandi says so and leaves the baseline's guideline counts as they
-are. It doesn't fail the run, and it doesn't count what it didn't judge. A key that OpenRouter refuses, or an answer
-sandi can't read, is exit 2. `sandi --update` also drops recorded answers the tree no longer uses.
+are. It doesn't fail the run, and it doesn't count what it didn't judge. A key that OpenRouter refuses, an answer
+sandi can't read, or a file it can't write is exit 2. `sandi --update` also drops recorded answers the tree no longer
+uses.
 
 Jev is pinned to a version, `typesafe/jev-1.14`, rather than the `jev-latest` alias, so a new Jev can't change the
 counts under a baseline. Moving to a new version asks every question again.
