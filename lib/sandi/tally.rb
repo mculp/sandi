@@ -22,9 +22,9 @@ module Sandi
     def total = @counts.values.sum
     def file_count = keys.map(&:first).uniq.size
 
-    def by_name
-      @counts.each_with_object(Hash.new(0)) { |((_file, name), count), sums| sums[name] += count }.sort.to_h
-    end
+    # What a counter's summary says of its counts, out of the files it read: "3 (ClassLength 1, MethodLength 2) in 2
+    # of 9 files".
+    def summary(files) = "#{total} (#{kinds}) in #{file_count} of #{files} files"
 
     # Every place the count differs from the earlier one, in file order.
     def changes_from(earlier)
@@ -35,6 +35,14 @@ module Sandi
 
     def to_h
       @counts.sort.each_with_object({}) { |((file, name), count), nested| (nested[file] ||= {})[name] = count }
+    end
+
+    private
+
+    def kinds = by_name.map { |name, count| "#{name} #{count}" }.join(", ")
+
+    def by_name
+      @counts.each_with_object(Hash.new(0)) { |((_file, name), count), sums| sums[name] += count }.sort.to_h
     end
   end
 end

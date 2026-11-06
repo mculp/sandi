@@ -6,9 +6,10 @@ Gem::Specification.new do |spec|
   spec.name = "sandi"
   spec.version = Sandi::VERSION
   spec.authors = ["Matt Culpepper"]
-  spec.summary = "A ratchet on Sandi Metz's four rules"
-  spec.description = "Counts what breaks Sandi Metz's rules with RuboCop and Prism, holds the counts against a " \
-                     "committed baseline that may fall and never rise, and fails when one rises."
+  spec.summary = "A ratchet on Sandi Metz's four rules, and her guidelines"
+  spec.description = "Counts what breaks Sandi Metz's rules with RuboCop and Prism, and what Jev, a decision model, " \
+                     "judges breaks her guidelines, holds the counts against a committed baseline that may fall and " \
+                     "never rise, and fails when one rises."
   spec.homepage = "https://github.com/mculp/sandi"
   spec.required_ruby_version = ">= 3.3"
   spec.metadata["source_code_uri"] = spec.homepage

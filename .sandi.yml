@@ -1,0 +1,6 @@
+# sandi holds its own comments to its guidelines. Jev's answers are committed in .sandi-judgments.json, so CI replays
+# them and needs no key. After a change to a comment, or to the code it is about, record the new answers with
+# `bundle exec exe/sandi --update` and OPENROUTER_API_KEY set, and commit them.
+guidelines:
+  - WhatComment
+  - StaleComment

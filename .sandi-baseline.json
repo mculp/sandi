@@ -6,5 +6,9 @@
   "rule 4": {
     "counter": "distinct constants a script calls methods on outside any def, read with Prism; limit 1",
     "counts": {}
+  },
+  "guidelines": {
+    "counter": "WhatComment, StaleComment asked of comments by Jev (typesafe/jev-1.14) through OpenRouter, a yes at 0.7",
+    "counts": {}
   }
 }
