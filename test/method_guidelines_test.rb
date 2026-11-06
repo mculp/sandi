@@ -18,8 +18,9 @@ class MethodGuidelinesTest < SandiCase
       end
     end
   RUBY
-  INITIALIZE = "  def initialize(items)\n    @items = items\n  end\n"
-  TOTAL = "  def total\n    @items.map(&:price).sum\n  end\n"
+  # What Jev reads about each of the cart's methods: its own source, as though it began its line.
+  INITIALIZE = "def initialize(items)\n  @items = items\nend"
+  TOTAL = "def total\n  @items.map(&:price).sum\nend"
   FROM_THE_BOOKS = %w[AskForWhat Demeter InjectDependency TypeSwitch FlagParameter NullCheck].freeze
 
   # The cart, with the guidelines named turned on and a Jev that says yes (0.9) to every question about the methods
@@ -68,9 +69,49 @@ class MethodGuidelinesTest < SandiCase
     RUBY
     rubocop_reports("lib/report.rb" => [])
     sandi
-    sources = ["    def plain(row) = row.to_s\n", "  def self.loud(row) = row.to_s.upcase\n", "  def to_s = name\n",
-               "def report(rows)\n  rows.map { |row| Format.loud(row) }\nend\n"]
+    sources = ["def plain(row) = row.to_s", "def report(rows)\n  rows.map { |row| Format.loud(row) }\nend",
+               "def self.loud(row) = row.to_s.upcase", "def to_s = name"]
     assert_equal(sources.map { |source| {"method" => source} }, states)
+  end
+
+  def test_a_def_is_sent_as_its_own_source_without_the_code_it_shares_a_line_with
+    guidelines("Demeter")
+    jev { 0.1 }
+    write("lib/shop.rb", <<~RUBY)
+      Item = Struct.new(:price) { def to_s = price.to_s }
+      class Shelf; def size = 3; def empty? = size.zero?; end
+      class Basket
+        private def subtotal
+          @items.sum(&:price)
+        end
+      end
+    RUBY
+    rubocop_reports("lib/shop.rb" => [])
+    sandi
+    sources = ["def empty? = size.zero?", "def size = 3", "def subtotal\n  @items.sum(&:price)\nend",
+               "def to_s = price.to_s"]
+    assert_equal(sources.map { |source| {"method" => source} }, states)
+  end
+
+  def test_each_def_counts_even_beside_one_on_its_line_that_reads_the_same
+    guidelines("Demeter")
+    jev { 0.9 }
+    twins = "class Order; def name = @order.owner.name; end; class Gift; def name = @order.owner.name; end\n"
+    write("lib/names.rb", twins)
+    rubocop_reports("lib/names.rb" => [])
+    assert_equal 0, sandi("--update", "--allow-increase")
+    assert_includes @out, "guidelines: 2 (Demeter 2) in 1 of 1 files"
+  end
+
+  def test_methods_that_read_the_same_are_asked_about_once_and_each_counts
+    guidelines("Demeter")
+    jev { 0.9 }
+    write("lib/order.rb", "class Order\n  def owner_name = @order.owner.name\nend\n")
+    write("lib/gift.rb", "def owner_name = @order.owner.name\n")
+    rubocop_reports("lib/order.rb" => [], "lib/gift.rb" => [])
+    assert_equal 0, sandi("--update", "--allow-increase")
+    assert_equal [{"method" => "def owner_name = @order.owner.name"}], states
+    assert_includes @out, "guidelines: 2 (Demeter 2) in 2 of 2 files"
   end
 
   def test_a_method_jev_says_yes_to_counts_against_its_file
@@ -91,14 +132,14 @@ class MethodGuidelinesTest < SandiCase
   def test_guidelines_about_comments_and_about_methods_are_each_asked_only_about_their_own_places
     cart("WhatComment", "Demeter")
     sandi
-    comment = {"comment" => "The items in the cart.", "code" => INITIALIZE}
+    comment = {"comment" => "The items in the cart.", "code" => "  def initialize(items)\n    @items = items\n  end\n"}
     expected = [[comment, %w[WhatComment]], [{"method" => INITIALIZE}, %w[Demeter]], [{"method" => TOTAL}, %w[Demeter]]]
     assert_equal expected, asked
   end
 
   def test_a_new_method_jev_says_yes_to_fails_and_is_pointed_to_at_its_def
     cart("Demeter", yes: [TOTAL])
-    write("lib/cart.rb", CART.sub("\n#{TOTAL}", ""))
+    write("lib/cart.rb", CART.sub("\n  def total\n    @items.map(&:price).sum\n  end\n", ""))
     assert_equal 0, sandi("--update", "--allow-increase")
     write("lib/cart.rb", CART)
     assert_equal 1, sandi
@@ -122,7 +163,7 @@ class MethodGuidelinesTest < SandiCase
     @jev.requests.clear
     write("lib/cart.rb", CART.sub("map(&:price).sum", "sum(&:price)"))
     sandi
-    assert_equal [{"method" => "  def total\n    @items.sum(&:price)\n  end\n"}], states
+    assert_equal [{"method" => "def total\n  @items.sum(&:price)\nend"}], states
   end
 
   def test_a_method_longer_than_a_class_is_sent_up_to_a_class_worth_of_lines

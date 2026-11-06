@@ -5,9 +5,9 @@
 #
 #   {"comment": "the comment's text", "code": "the class, module or def it documents, or the method it is in"}
 #
-# and a guideline `about: method` is asked about each def, with its source, as the state
+# and a guideline `about: method` is asked about each def, with its own source, as the state
 #
-#   {"method": "the def, from its first line to its end"}
+#   {"method": "the def, from `def` to `end`, as though it began its line"}
 #
 # Jev answers with a noul, the probability that the answer is yes. A yes counts against the file the place is in. A
 # project turns guidelines on by name in its .sandi.yml.

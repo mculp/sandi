@@ -36,7 +36,8 @@ Jev is built for fast, narrow judgments, the kind a reader makes in a second wit
 ## The guidelines sandi has
 
 Each guideline in `config/guidelines.yml` says what kind of place it reads with `about:`, `comment` by default or
-`method`, and is asked only about places of that kind. Every question about one place goes to Jev in one request.
+`method`, and is asked only about places of that kind. Every question about one place goes to Jev in one request, and
+places that read the same, such as one method in two files, share it.
 
 WhatComment and StaleComment are calibrated against Jev, as [Calibration](#calibration) describes. The six method
 guidelines aren't yet: they were written when no OpenRouter key was available to ask Jev about examples, so treat
@@ -60,8 +61,9 @@ can't see that method.
 
 ### Methods
 
-They read a method: each `def`, wherever it is defined, sent with its source. The state is `{"method": ...}`. A
-method within Sandi's second rule is sent whole, and one over 100 lines is cut off there.
+They read a method: each `def`, wherever it is defined, sent with its own source from `def` to `end`, as though it
+began its line, so nothing else on its line goes with it. The state is `{"method": ...}`. A method within Sandi's
+second rule is sent whole, and one over 100 lines is cut off there.
 
 **AskForWhat**: *Does the method tell another object how to do a job step by step, rather than ask for what it wants?*
 POODR, chapter 4, on asking for "what" instead of telling "how". A trip that tells a mechanic to clean the bicycle,

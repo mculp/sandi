@@ -78,9 +78,10 @@ guidelines:
 Each guideline reads one kind of place. WhatComment and StaleComment are asked about every comment written for a
 reader: a comment just above a `class`, `module` or `def`, and a comment on its own lines inside a method, each sent
 with the code it is about. Shebangs, magic comments, `rubocop:` directives and comments after code on the same line are
-skipped. The other six are asked about every `def`, sent with its source, whether it's in a class or module, in
-`class << self`, in a block or at the top of a script. The questions are in `config/guidelines.yml`, and
-[GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still to come.
+skipped. The other six are asked about every `def`, sent with its own source and nothing else on its line, whether
+it's in a class or module, in `class << self`, in a block or at the top of a script. The questions are in
+`config/guidelines.yml`, and [GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still
+to come.
 
 Jev answers with the probability that the answer is yes. A yes of 0.7 or more counts against the file the comment or
 method is in, in the same baseline and ratchet as the rules. When a count rises, sandi names what's behind it, by the
@@ -94,12 +95,12 @@ guidelines: 3 (Demeter 1, StaleComment 1, WhatComment 1) in 1 of 1 files
 asked Jev (typesafe/jev-1.14) through OpenRouter 9 of 9 questions in 0.5s: 600 input tokens, about $0.00003
 ```
 
-Every question about one comment or method goes to Jev in one request. Asking needs an OpenRouter key in
-`OPENROUTER_API_KEY`. Jev's answers go in `.sandi-judgments.json`, which you commit beside the baseline. A model asked
-the same borderline question twice can answer differently, so sandi asks about a comment or method once and reuses the
-answer until its text or code, the question or the model changes. A method that only moves keeps its answer. A rerun on
-the same tree asks nothing and counts the same, and CI can check guidelines without a key once every answer is
-recorded.
+Every question about one comment or method goes to Jev in one request, and two that read the same, such as one method
+in two files, share it. Asking needs an OpenRouter key in `OPENROUTER_API_KEY`. Jev's answers go in
+`.sandi-judgments.json`, which you commit beside the baseline. A model asked the same borderline question twice can
+answer differently, so sandi asks about a comment or method once and reuses the answer until its text or code, the
+question or the model changes. A method that only moves keeps its answer. A rerun on the same tree asks nothing and
+counts the same, and CI can check guidelines without a key once every answer is recorded.
 
 WhatComment and StaleComment were calibrated against Jev on labeled examples and on sandi's own comments, as
 [GUIDELINES.md](GUIDELINES.md) describes. The six method questions haven't been calibrated yet, so treat their first

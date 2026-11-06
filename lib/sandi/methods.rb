@@ -3,10 +3,11 @@
 require "prism"
 
 module Sandi
-  # The methods in a file, each def with its source, wherever it is defined: in a class or a module, in a block, in
-  # `class << self` or at the top of a script.
+  # The methods in a file, each def with its own source, wherever it is defined: in a class or a module, in a block, in
+  # `class << self`, at the top of a script, or on a line with other code.
   class Methods
-    Method = Data.define(:file, :line, :code) do
+    # A def is where it starts, by line and column, since two can share a line.
+    Method = Data.define(:file, :line, :column, :code) do
       # What Jev reads to answer a question about the method.
       def state = {"method" => code}
     end
@@ -20,15 +21,18 @@ module Sandi
       @file, @parse = file, parse
     end
 
-    def to_a = defs.map { |node| Method.new(@file, node.location.start_line, code(node)) }
+    def to_a = defs.map { |node| Method.new(@file, node.location.start_line, node.location.start_column, code(node)) }
 
     private
 
     def defs = nodes(@parse.value).select { |node| node.type == :def_node }
     def nodes(node) = [node, *node.compact_child_nodes.flat_map { |child| nodes(child) }]
 
-    def code(node) = source[node.location.start_line - 1, [length(node), LINES].min].join
-    def length(node) = node.location.end_line - node.location.start_line + 1
-    def source = @source ||= @parse.source.source.lines
+    # The def from its `def` to its `end`, as though it began its line: what shares a line with it is left out, and the
+    # lines under it lose the indent of the line it starts on.
+    def code(node)
+      indent = node.location.start_line_slice[/\A\s*/]
+      node.location.slice.lines.first(LINES).map { |line| line.delete_prefix(indent) }.join
+    end
   end
 end
