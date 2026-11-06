@@ -10,8 +10,8 @@ class FakeJev
 
   attr_reader :requests
 
-  def initialize(statuses: [], &noul)
-    @statuses, @noul, @requests = statuses.dup, noul, []
+  def initialize(statuses: [], replies: [], &noul)
+    @statuses, @replies, @noul, @requests = statuses.dup, replies.dup, noul, []
     @server = TCPServer.new("127.0.0.1", 0)
     @thread = Thread.new { loop { serve(@server.accept) } }
   end
@@ -35,8 +35,10 @@ class FakeJev
     client.close
   end
 
-  # Every field Jev sends back: the answers by question name, the model that gave them and the tokens it read.
+  # Every field Jev sends back: the answers by question name, the model that gave them and the tokens it read. A reply
+  # the test gave goes first, in place of all of that.
   def answer(body)
+    return @replies.shift unless @replies.empty?
     answers = body["questions"].keys.to_h { |name| [name, {"type" => "noul", "noul" => @noul.call(body["state"], name)}] }
     {"model" => "jev-1.14.0", "answers" => answers, "usage" => {"input_tokens" => 120, "output_tokens" => 12}}
   end

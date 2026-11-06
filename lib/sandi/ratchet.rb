@@ -9,7 +9,7 @@ module Sandi
       @counters, @baseline, @out = counters, baseline, out
     end
 
-    # 0 when no count rose above the baseline, 1 when one did.
+    # The exit status: 0 when no count rose above the baseline, 1 when one did.
     def check
       verdict = compare
       @out.puts(verdict.closing)

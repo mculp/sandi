@@ -78,10 +78,10 @@ guidelines:
 Each guideline reads one kind of place. WhatComment and StaleComment are asked about every comment written for a
 reader: a comment just above a `class`, `module` or `def`, and a comment on its own lines inside a method, each sent
 with the code it is about. Shebangs, magic comments, `rubocop:` directives and comments after code on the same line are
-skipped. The other six are asked about every `def`, sent with its own source and nothing else on its line, whether
-it's in a class or module, in `class << self`, in a block or at the top of a script. The questions are in
-`config/guidelines.yml`, and [GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still
-to come.
+skipped, though a directive between a comment and the definition under it doesn't separate them. The other six are
+asked about every `def`, sent with its own source and nothing else on its line, whether it's in a class or module, in
+`class << self`, in a block or at the top of a script. The questions are in `config/guidelines.yml`, and
+[GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still to come.
 
 Jev answers with the probability that the answer is yes. A yes of 0.7 or more counts against the file the comment or
 method is in, in the same baseline and ratchet as the rules. When a count rises, sandi names what's behind it, by the
@@ -107,8 +107,9 @@ WhatComment and StaleComment were calibrated against Jev on labeled examples and
 counts as a draft.
 
 Without a key, and with some answer not yet recorded, sandi says so and leaves the baseline's guideline counts as they
-are. It doesn't fail the run, and it doesn't count what it didn't judge. A key that OpenRouter refuses, or an answer
-sandi can't read, is exit 2. `sandi --update` also drops recorded answers the tree no longer uses.
+are. It doesn't fail the run, and it doesn't count what it didn't judge. A key that OpenRouter refuses, an answer
+sandi can't read, or a file it can't write is exit 2. `sandi --update` also drops recorded answers the tree no longer
+uses.
 
 Jev is pinned to a version, `typesafe/jev-1.14`, rather than the `jev-latest` alias, so a new Jev can't change the
 counts under a baseline. Moving to a new version asks every question again.
@@ -123,3 +124,7 @@ bundle exec exe/sandi    # sandi holds itself to its own rules
 
 The tests run against a fake `rubocop` on the `PATH` and a fake Jev on localhost, which `SANDI_JEV_URL` points sandi
 at, so they need no network, no key and no real RuboCop.
+
+sandi holds its own comments to its guidelines too, from the answers committed in `.sandi-judgments.json`, so
+`bundle exec exe/sandi` needs no key. After changing a comment, or the code it is about, run
+`bundle exec exe/sandi --update` with `OPENROUTER_API_KEY` set to record the answers that change needs, and commit them.

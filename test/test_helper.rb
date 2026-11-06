@@ -47,21 +47,28 @@ class SandiCase < Minitest::Test
   # A .sandi.yml that turns on the guidelines named.
   def guidelines(*names) = write(".sandi.yml", "guidelines:\n#{names.map { |name| "  - #{name}\n" }.join}")
 
+  # A file that sandi can read but not write.
+  def read_only(path, body)
+    skip "root can write a read-only file" if Process.uid.zero?
+    write(path, body)
+    File.chmod(0o444, File.join(@root, path))
+  end
+
   # A Jev on localhost that answers each question with what the block gives for the state and the question's name. The
-  # first answers can be HTTP errors instead, one per status given.
-  def jev(statuses: [], &noul)
+  # first answers can be HTTP errors instead, one per status given, or whole replies of the test's own, one per reply.
+  def jev(statuses: [], replies: [], &noul)
     @jev&.stop
-    @jev = FakeJev.new(statuses: statuses, &noul)
+    @jev = FakeJev.new(statuses: statuses, replies: replies, &noul)
   end
 
   # A Jev that says yes (0.9) to every question about the comments given and no (0.1) to the rest.
   def jev_says_yes_to(*comments) = jev { |state, _name| comments.include?(state["comment"]) ? 0.9 : 0.1 }
 
-  # The exit status of `sandi *argv` with only the fake tools on the PATH, only the fake Jev to ask and `key` as the
-  # OpenRouter key, or none. Leaves what it said in @out and @err.
-  def sandi(*argv, key: "test-key")
+  # The exit status of `sandi *argv` with only the fake tools on the PATH, only the fake Jev to ask, at `url`, and `key`
+  # as the OpenRouter key, or none. Leaves what it said in @out and @err.
+  def sandi(*argv, key: "test-key", url: jev_url)
     out, err = StringIO.new, StringIO.new
-    status = with_env("PATH" => @tools, "OPENROUTER_API_KEY" => key, "SANDI_JEV_URL" => jev_url) do
+    status = with_env("PATH" => @tools, "OPENROUTER_API_KEY" => key, "SANDI_JEV_URL" => url) do
       Sandi::CLI.new(argv, root: @root, out: out, err: err).call
     end
     @out, @err = out.string, err.string

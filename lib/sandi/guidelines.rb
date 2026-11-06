@@ -32,8 +32,7 @@ module Sandi
     def asked_of = @guidelines.group_by(&:about).map { |about, guidelines| "#{names(guidelines)} asked of #{about}s" }
     def names(guidelines) = guidelines.map(&:name).join(", ")
 
-    def counts = "#{NAME}: #{tally.total} (#{kinds}) in #{tally.file_count} of #{judgments.map(&:file).uniq.size} files"
-    def kinds = tally.by_name.map { |guideline, count| "#{guideline} #{count}" }.join(", ")
+    def counts = "#{NAME}: #{tally.summary(judgments.map(&:file).uniq.size)}"
     def unjudged = "#{NAME}: not judged, so the baseline's counts stand: #{@judge.excuse(judgments)}"
 
     # Where the yeses are in a file whose count rose: no other tool can show them.

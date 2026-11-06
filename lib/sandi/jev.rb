@@ -32,14 +32,19 @@ module Sandi
     # The noul for each question about the state, by the question's name, and the input tokens Jev read to answer.
     def nouls(state, questions)
       reply = JSON.parse(post(JSON.generate("model" => MODEL, "state" => state, "questions" => questions)))
+      raise TypeError, "the reply is not a JSON object" unless reply.is_a?(Hash)
       [questions.keys.to_h { |name| [name, noul(reply, name)] }, reply.dig("usage", "input_tokens").to_i]
-    rescue JSON::ParserError, TypeError => error
+    rescue JSON::ParserError, TypeError, Net::HTTPBadResponse => error
       raise Error, "#{description} answered in a way sandi can't read: #{error.message}"
     end
 
     private
 
-    def noul(reply, name) = reply.dig("answers", name, "noul") || raise(Error, "#{description} did not answer #{name}")
+    # A noul is a number, so an answer that isn't one is no answer.
+    def noul(reply, name)
+      noul = reply.dig("answers", name, "noul")
+      noul.is_a?(Numeric) ? noul : raise(Error, "#{description} did not answer #{name}")
+    end
 
     def post(body, pauses = PAUSES)
       response = request(body)
@@ -53,7 +58,7 @@ module Sandi
 
     def request(body)
       Net::HTTP.start(@uri.host, @uri.port, use_ssl: @uri.scheme == "https", open_timeout: 10, read_timeout: 30) do |http|
-        http.post(@uri.path, body, "Authorization" => "Bearer #{@key}", "Content-Type" => "application/json")
+        http.post(@uri.request_uri, body, "Authorization" => "Bearer #{@key}", "Content-Type" => "application/json")
       end
     rescue SocketError, SystemCallError, IOError, Timeout::Error, OpenSSL::SSL::SSLError => error
       raise Error, "#{description} could not be reached: #{error.message}"
