@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "baseline"
-require_relative "comments"
 require_relative "entry_points"
 require_relative "errors"
 require_relative "guidelines"
@@ -9,6 +8,7 @@ require_relative "jev"
 require_relative "judge"
 require_relative "judgments"
 require_relative "offenses"
+require_relative "places"
 require_relative "ratchet"
 require_relative "rubocop"
 require_relative "settings"
@@ -50,12 +50,11 @@ module Sandi
       Ratchet.new(counters, baseline, @out)
     end
 
-    # The guidelines .sandi.yml turns on, if any, asked of the comments in the files RuboCop inspected.
+    # The guidelines .sandi.yml turns on, if any, asked of the comments or methods in the files RuboCop inspected.
     def guidelines(paths)
       chosen = Settings.new(File.join(@root, SETTINGS)).guidelines
       return [] if chosen.empty?
-      comments = paths.flat_map { |path| Comments.of(path, root: @root) }
-      [Guidelines.new(chosen, comments, judge, baseline: baseline.tally(Guidelines::NAME))]
+      [Guidelines.new(chosen, Places.new(paths, root: @root), judge, baseline: baseline.tally(Guidelines::NAME))]
     end
 
     def judge = Judge.new(Jev.new, Judgments.new(File.join(@root, JUDGMENTS), prune: update?))

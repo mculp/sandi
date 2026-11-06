@@ -1,14 +1,21 @@
 # Sandi Metz's guidelines: what she says about code that a parser can't check, put to Jev, TypeSafe's decision model,
-# as yes/no questions. Each is asked about one comment, with the code it is about, as the state
+# as yes/no questions. Each is asked about one place in the code at a time, and `about` says which kind. A guideline
+# about a comment, the default, is asked about each comment written for a reader, with the code it is about, as the
+# state
 #
 #   {"comment": "the comment's text", "code": "the class, module or def it documents, or the method it is in"}
 #
-# and Jev answers with a noul, the probability that the answer is yes. A yes counts against the comment's file. A
+# and a guideline `about: method` is asked about each def, with its own source, as the state
+#
+#   {"method": "the def, from `def` to `end`, as though it began its line"}
+#
+# Jev answers with a noul, the probability that the answer is yes. A yes counts against the file the place is in. A
 # project turns guidelines on by name in its .sandi.yml.
 #
 # Each question is phrased so that yes is the finding, and its criteria say where yes ends. Changing a question's
-# words changes every answer's key, so the next run asks Jev again. These words were calibrated against Jev on
-# labeled examples, as GUIDELINES.md describes, so calibrate again before changing them.
+# words changes every answer's key, so the next run asks Jev again. The comment questions were calibrated against
+# Jev on labeled examples, as GUIDELINES.md describes, so calibrate again before changing their words. The method
+# questions haven't been calibrated yet.
 
 # Practical Object-Oriented Design in Ruby, chapter 2: when a bit of code inside a method needs a comment, extract it
 # into a method named for what the comment says, and the name can't drift from the code the way the comment can. So
@@ -37,3 +44,100 @@ StaleComment:
       Everything the comment says about the code is true of it, or the comment says nothing the code could
       contradict. A method defined outside `code` may well do what the comment says, so a claim about one is not
       contradicted. Ruby's own methods do what Ruby documents.
+
+# Practical Object-Oriented Design in Ruby, chapter 4. A method that tells another object the steps of a job knows how
+# that object does its work, and has to change whenever that object does. One message that asks for what it wants
+# leaves the how to the object.
+AskForWhat:
+  about: method
+  instructions: Does `method` tell another object how to do a job step by step, rather than ask for what it wants?
+  criteria:
+    "true": >-
+      The method sends one object a series of messages that are the steps of a single job that object could do on its
+      own, such as cleaning, pumping and checking a bicycle to prepare it, so the method knows how the other object
+      does its job and in what order.
+    "false": >-
+      Each message the method sends asks for one thing it wants, even when it sends several to one object, such as
+      reading a name and an email to build its own result. Calls chained on a collection, a query or a builder made
+      for chaining are not steps of another object's job, and neither is work the method does itself with the values
+      it holds.
+
+# Practical Object-Oriented Design in Ruby, chapter 4, and 99 Bottles of OOP. A method that reaches through one object
+# to the objects behind it depends on how its neighbors are put together, and wanting to reach through is a sign of a
+# missing abstraction.
+Demeter:
+  about: method
+  instructions: Does `method` reach through an object to send a message to one of that object's collaborators?
+  criteria:
+    "true": >-
+      The method gets an object from another object and then sends it a message of its own, as in
+      `customer.bicycle.wheel.rotate`, so it depends on how objects it doesn't talk to directly are put together. The
+      objects along such a chain are different kinds of things, each with behavior of its own.
+    "false": >-
+      The method sends messages only to self, its arguments, the objects it creates and the objects its instance
+      variables hold, or each call in a chain transforms a value: a collection, a string or a number, as in
+      `items.map(&:price).sum` or `name.strip.downcase`.
+
+# Practical Object-Oriented Design in Ruby, chapter 3, and 99 Bottles of OOP. A method that creates the objects it
+# works with can only ever work with those classes. Given the objects instead, it works with anything that plays their
+# roles, and creating objects moves to the edges of the program.
+InjectDependency:
+  about: method
+  instructions: Does `method` create an object of a specific class that it could be given instead?
+  criteria:
+    "true": >-
+      The method creates an object from a class it names and relies on that object to do part of its work, as in
+      `Wheel.new(rim, tire).diameter`, or keeps it to work with later, as in `@mailer = Mailer.new`, and a caller has
+      no way to give it a different object that plays the same role.
+    "false": >-
+      A caller can supply the object, as an argument or an argument's default, or the object is the method's product
+      rather than a collaborator: a value or result it returns, an error it raises, or a collection, string or number
+      it computes with. A factory, a class method that builds instances and a script's top-level wiring are where
+      objects should be created.
+
+# Practical Object-Oriented Design in Ruby, chapter 5. A method that checks what kind of object it has, to decide what
+# to do with it, holds a duck type waiting to be named: each kind could answer one message in its own way, and the
+# check would go.
+TypeSwitch:
+  about: method
+  instructions: Does `method` decide what to do by checking what kind of object it has?
+  criteria:
+    "true": >-
+      The method chooses between behaviors by asking an object what it is, with a `case` on its class, `is_a?`,
+      `kind_of?`, `instance_of?`, `respond_to?` or a comparison of classes, so the behavior of each kind lives in this
+      method rather than in the objects, which could each answer the same message.
+    "false": >-
+      The method checks a type only where input from outside the program arrives, such as parsed JSON or YAML or a
+      command-line argument, to accept, convert or reject it; or the objects come from a library it can't change,
+      such as a parser's nodes or an HTTP response; or it branches on a value, not a kind, as in `case status when :ok`.
+
+# "The Wrong Abstraction" (2016). A shared method gains a parameter, and a conditional on it, for each caller that
+# needs something a little different, until no one can say what it does. Duplicating the method is cheaper than
+# keeping that abstraction.
+FlagParameter:
+  about: method
+  instructions: Does a parameter of `method` choose which of several behaviors it runs?
+  criteria:
+    "true": >-
+      The method takes a parameter, such as a boolean, a symbol, a string or an option in a hash, whose value picks
+      which branch of its code runs, so callers get different behavior from one method by what they pass.
+    "false": >-
+      Every parameter is data the method works on. A condition on a parameter that handles the data's own cases, such
+      as an empty list or a missing name, is not a flag, and neither is a setting that tunes how much or how often,
+      such as `limit:` or `retries:`, or a parameter the method only passes on.
+
+# "Nothing is Something" (RailsConf 2015). A method that checks for nil before it sends a message keeps the behavior
+# of a missing object in a conditional, and every caller repeats the check. An object that stands for nothing can take
+# the message instead.
+NullCheck:
+  about: method
+  instructions: Does `method` branch on nil where an object that stands for nothing could take the message instead?
+  criteria:
+    "true": >-
+      The method checks whether an object it was given or holds is nil, with `nil?`, `if thing`, `&.`, `||` or
+      `present?`, and does something else when it is, for an object that plays a role in the program, such as a
+      customer or a logger, when an object standing for the missing one could answer the same messages instead.
+    "false": >-
+      The nil comes from outside the program, such as an unset environment variable, a missing file, key or argument,
+      or user input, and is checked where it arrives; or nil means the end of a search, a loop or a recursion; or
+      `||=` memoizes a value.

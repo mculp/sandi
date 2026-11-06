@@ -44,6 +44,9 @@ class SandiCase < Minitest::Test
 
   def script(path, body) = write(path, "#!/usr/bin/env ruby\n#{body}")
 
+  # A .sandi.yml that turns on the guidelines named.
+  def guidelines(*names) = write(".sandi.yml", "guidelines:\n#{names.map { |name| "  - #{name}\n" }.join}")
+
   # A file that sandi can read but not write.
   def read_only(path, body)
     skip "root can write a read-only file" if Process.uid.zero?
