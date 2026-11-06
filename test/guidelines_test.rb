@@ -153,7 +153,7 @@ class GuidelinesTest < SandiCase
     sandi
     code = @jev.requests.first.body.dig("state", "code")
     assert_includes code, "# Totals the cart."
-    assert_equal Sandi::Comments::LINES, code.lines.size
+    assert_equal Sandi::Source::LINES, code.lines.size
   end
 
   def test_a_comment_near_the_end_of_a_long_method_is_asked_with_its_last_lines
@@ -164,7 +164,7 @@ class GuidelinesTest < SandiCase
     code = @jev.requests.first.body.dig("state", "code")
     assert_includes code, "# Totals the cart."
     assert_equal "end\n", code.lines.last
-    assert_equal Sandi::Comments::LINES, code.lines.size
+    assert_equal Sandi::Source::LINES, code.lines.size
   end
 
   def test_a_comment_near_the_top_of_a_long_method_is_asked_with_its_first_lines
@@ -175,7 +175,7 @@ class GuidelinesTest < SandiCase
     code = @jev.requests.first.body.dig("state", "code")
     assert_equal "def long\n", code.lines.first
     assert_includes code, "# Totals the cart."
-    assert_equal Sandi::Comments::LINES, code.lines.size
+    assert_equal Sandi::Source::LINES, code.lines.size
   end
 
   def test_jev_is_asked_with_the_key_the_pinned_model_and_the_comment_with_the_definition_it_documents

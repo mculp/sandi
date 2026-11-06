@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "minitest/mock"
 require_relative "test_helper"
 
 # Sandi's guidelines about methods: each def put to Jev, here a fake one on localhost, with its source as the state.
@@ -39,6 +40,14 @@ class MethodGuidelinesTest < SandiCase
   def asked
     pairs = @jev.requests.map { |request| [request.body["state"], request.body["questions"].keys.sort] }
     pairs.sort_by { |state, _names| JSON.generate(state) }
+  end
+
+  def test_a_file_is_parsed_once_however_many_kinds_of_place_are_asked_about
+    cart("WhatComment", "Demeter")
+    parses = 0
+    real = Prism.method(:parse_file)
+    Prism.stub(:parse_file, ->(path) { parses += 1; real.call(path) }) { sandi }
+    assert_equal 1, parses
   end
 
   def test_a_method_guideline_is_asked_about_each_method_with_its_source_and_about_nothing_else

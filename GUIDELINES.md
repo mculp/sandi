@@ -126,8 +126,8 @@ What the calibration showed:
   from moving on its own, and the answer recorded first is the one that counts. A comment that scores near 0.7 is
   reworded, not asked about again until it passes.
 
-sandi runs both guidelines on its own comments, from the answers committed in `.sandi-judgments.json`: 92 questions
-about the 46 comments in its `lib/` and `exe/`. The first 78 took 1.9 seconds and about a tenth of a cent to ask. None
+sandi runs both guidelines on its own comments, from the answers committed in `.sandi-judgments.json`: 108 questions
+about the 54 comments in its `lib/` and `exe/`. The first 78 took 1.9 seconds and about a tenth of a cent to ask. None
 counts, and the highest is 0.59, WhatComment on the comment above `counts_against` in `lib/sandi/judgment.rb`. CI
 replays the answers and needs no key, so a comment that changes shows as not judged until someone records its answers
 with `sandi --update`.
@@ -192,8 +192,8 @@ Some of her advice can be counted, and belongs with the rules:
 
 ## What to build next
 
-1. Read the comments above a constant, which sandi skips now: 9 of the 55 in its own code, among them the one above
-   `Judgment = Data.define`.
+1. Read the comments above a constant, which sandi skips now: 10 of the 64 in its own code, among them the two above a
+   `Data.define`.
 2. Calibrate the six method guidelines the way the comment guidelines were, and turn each on for sandi once it is.
 3. Add HiddenStructure, OneJob and ConceptName. Methods are read already, so each needs only a calibrated question.
 4. Add classes, then tests.
