@@ -4,3 +4,11 @@
 guidelines:
   - WhatComment
   - StaleComment
+
+# `bundle exec exe/sandi --autocorrect` asks these models, in turn, to rewrite the files that break a rule, and keeps a
+# rewrite only if the counts fall, no method is lost and the tests pass.
+autocorrect:
+  test: bundle exec rake test
+  model:
+    - anthropic/claude-haiku-5.5
+    - openai/gpt-6.1-terra

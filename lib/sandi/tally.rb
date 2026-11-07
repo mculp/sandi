@@ -19,6 +19,9 @@ module Sandi
 
     def keys = @counts.keys
     def count(key) = @counts.fetch(key, 0)
+
+    # What one file has, by name: {"MethodLength" => 2}.
+    def of(file) = @counts.select { |(path, _name), _count| path == file }.to_h { |(_path, name), count| [name, count] }
     def total = @counts.values.sum
     def file_count = keys.map(&:first).uniq.size
 

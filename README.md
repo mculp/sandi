@@ -21,6 +21,9 @@ Most code doesn't meet them yet. `sandi` records each file's counts in `.sandi-b
 count rises or a file the baseline lacks has an offense. Counts can fall and never rise. Its first line is the
 progress to quote in a PR, and it names the files that improved.
 
+`sandi --autocorrect` can fix what it counts: it asks a code model to rewrite the files that break a rule, and keeps a
+rewrite only if it checks out. See [Autocorrect](#autocorrect).
+
 ## Install
 
 ```ruby
@@ -54,14 +57,17 @@ Run it from the project's root:
 bundle exec sandi                                # 0: no count rose, 1: one did, 2: couldn't count or misused
 bundle exec sandi --update                       # write today's counts as the baseline; refuses to raise one
 bundle exec sandi --update --allow-increase      # write them even if a count rose
+bundle exec sandi --autocorrect                  # first rewrite the files that break a rule, then do the above
 ```
 
 A PR doesn't have to touch the baseline, which keeps parallel PRs from conflicting. Tighten it after merges with
-`sandi --update`.
+`sandi --update`. `--autocorrect` runs first and combines with `--update`: sandi fixes what it can, then checks, or
+records, what is left.
 
 ## Guidelines
 
-Turn guidelines on by name in `.sandi.yml`:
+A guideline is one yes/no question about one place in the code, put to Jev and phrased so that yes is the finding. Turn
+guidelines on by name in `.sandi.yml`:
 
 ```yaml
 guidelines:
@@ -75,13 +81,24 @@ guidelines:
   - NullCheck         # a method that checks for nil where an object standing for nothing could answer
 ```
 
-Each guideline reads one kind of place. WhatComment and StaleComment are asked about every comment written for a
-reader: a comment just above a `class`, `module` or `def`, and a comment on its own lines inside a method, each sent
-with the code it is about. Shebangs, magic comments, `rubocop:` directives and comments after code on the same line are
-skipped, though a directive between a comment and the definition under it doesn't separate them. The other six are
-asked about every `def`, sent with its own source and nothing else on its line, whether it's in a class or module, in
-`class << self`, in a block or at the top of a script. The questions are in `config/guidelines.yml`, and
+### Places
+
+Each guideline reads one kind of place, and is asked about every place of that kind:
+
+- **A comment**, for WhatComment and StaleComment: every comment written for a reader, which is one just above a
+  `class`, `module` or `def`, or on its own lines inside a method. It is sent with the code it is about, the definition
+  it sits above or the method it is in. Shebangs, magic comments, `rubocop:` directives and comments after code on the
+  same line are skipped, and so is a comment above anything else, such as a constant. A directive between a comment and
+  the definition under it doesn't separate them.
+- **A method**, for the other six: every `def`, wherever it is defined, whether in a class or module, in
+  `class << self`, in a block or at the top of a script. It is sent as its own source, from `def` to `end`, as though
+  it began its line, so nothing else on its line goes with it.
+
+Jev judges worse as what it reads grows, so what it is sent stops at 100 lines, a class's worth: the first 100, or for a
+comment further into a longer method, the 100 around it. The questions are in `config/guidelines.yml`, and
 [GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still to come.
+
+### Answers
 
 Jev answers with the probability that the answer is yes. A yes of 0.7 or more counts against the file the comment or
 method is in, in the same baseline and ratchet as the rules. When a count rises, sandi names what's behind it, by the
@@ -95,6 +112,11 @@ guidelines: 3 (Demeter 1, StaleComment 1, WhatComment 1) in 1 of 1 files
 asked Jev (typesafe/jev-1.14) through OpenRouter 9 of 9 questions in 0.5s: 600 input tokens, about $0.00003
 ```
 
+Jev is pinned to a version, `typesafe/jev-1.14`, rather than the `jev-latest` alias, so a new Jev can't change the
+counts under a baseline. Moving to a new version asks every question again.
+
+### The record
+
 Every question about one comment or method goes to Jev in one request, and two that read the same, such as one method
 in two files, share it. Asking needs an OpenRouter key in `OPENROUTER_API_KEY`. Jev's answers go in
 `.sandi-judgments.json`, which you commit beside the baseline. A model asked the same borderline question twice can
@@ -102,17 +124,64 @@ answer differently, so sandi asks about a comment or method once and reuses the 
 question or the model changes. A method that only moves keeps its answer. A rerun on the same tree asks nothing and
 counts the same, and CI can check guidelines without a key once every answer is recorded.
 
-WhatComment and StaleComment were calibrated against Jev on labeled examples and on sandi's own comments, as
-[GUIDELINES.md](GUIDELINES.md) describes. The six method questions haven't been calibrated yet, so treat their first
-counts as a draft.
+The first answer recorded is the one that counts. A comment that scores near 0.7 is reworded, not asked about again
+until it passes.
 
 Without a key, and with some answer not yet recorded, sandi says so and leaves the baseline's guideline counts as they
 are. It doesn't fail the run, and it doesn't count what it didn't judge. A key that OpenRouter refuses, an answer
 sandi can't read, or a file it can't write is exit 2. `sandi --update` also drops recorded answers the tree no longer
 uses.
 
-Jev is pinned to a version, `typesafe/jev-1.14`, rather than the `jev-latest` alias, so a new Jev can't change the
-counts under a baseline. Moving to a new version asks every question again.
+### Calibration
+
+A question's wording decides its answers, so a guideline is calibrated before it counts: asked about labeled examples
+on each side of the line and about real code, to check that 0.7 separates them. WhatComment and StaleComment were
+calibrated against Jev on labeled examples and on sandi's own comments, as [GUIDELINES.md](GUIDELINES.md) describes. The
+six method questions haven't been calibrated yet, so treat their first counts as a draft.
+
+## Autocorrect
+
+RuboCop can't autocorrect Sandi's rules: shortening a method is a design decision, not a substitution. So
+`sandi --autocorrect` asks a code model, through OpenRouter and with the same key as Jev, to rewrite each file that
+counts against a rule, and then checks what it gets rather than trusting it. A rewrite is kept only if
+
+- the file's count falls, and no kind of offense rises;
+- every method the file defined is still defined, so a failing test can't be fixed by deleting it; and
+- the project's tests still pass.
+
+Otherwise the rewrite is thrown away, the model is told why, and it tries again. Each model gets three tries at a file.
+What is kept is built on: a rewrite that fixes some of the offenses counts, and the next try starts from it, so a file
+that can't be fixed in one step is fixed in several. When the tries are used up, the file is as the last kept rewrite
+made it, or as it was. It fixes the four rules and leaves guidelines alone: a comment Jev counts against is for its
+author to reword. It rewrites only code RuboCop measures, so put your tests under `Include` to have them fixed too.
+
+Say how in `.sandi.yml`:
+
+```yaml
+autocorrect:
+  test: bundle exec rake test   # required: a rewrite is kept only if this succeeds
+  model:                        # one model or a list, asked in turn
+    - anthropic/claude-haiku-5.5
+    - openai/gpt-6.1-terra
+```
+
+Without `test` it won't start, because a rewrite nothing can check isn't worth keeping. Without `model` it asks
+`anthropic/claude-haiku-5.5`. With a list, each model gets its three tries at a file, and the next one only the files
+the one before couldn't fix, so a cheap model can take the easy files and a stronger one the rest. It says what each try
+did and what asking cost:
+
+```text
+autocorrect: test/cli_test.rb ClassLength 1, MethodLength 4
+  anthropic/claude-haiku-5.5 try 1: rejected: the tests failed
+  anthropic/claude-haiku-5.5 try 2: kept: 5 -> 1 offenses
+  anthropic/claude-haiku-5.5 try 3: kept: 1 -> 0 offenses
+autocorrect: fixed 1 of 1 files
+asked anthropic/claude-haiku-5.5 through OpenRouter 3 requests: 14000 input tokens, 11000 output tokens, about $0.0069
+```
+
+A file that is only partly fixed says so, as `partly fixed: lib/a.rb has 2 left`, and a file nothing could fix says
+`not fixed: lib/a.rb is as it was`. Run it on a clean tree, so that `git diff` shows only what it changed, and read that
+diff before you commit it: tests can pass while code stops meaning what it did.
 
 ## Develop
 
@@ -122,8 +191,11 @@ bundle exec rake test
 bundle exec exe/sandi    # sandi holds itself to its own rules
 ```
 
-The tests run against a fake `rubocop` on the `PATH` and a fake Jev on localhost, which `SANDI_JEV_URL` points sandi
-at, so they need no network, no key and no real RuboCop.
+sandi measures all of its own Ruby, tests included, and its large test classes were brought under the rules with
+`sandi --autocorrect`.
+
+The tests run against a fake `rubocop` on the `PATH`, a fake Jev and a fake code model on localhost, which
+`SANDI_JEV_URL` and `SANDI_AUTOCORRECT_URL` point sandi at, so they need no network, no key and no real RuboCop.
 
 sandi holds its own comments to its guidelines too, from the answers committed in `.sandi-judgments.json`, so
 `bundle exec exe/sandi` needs no key. After changing a comment, or the code it is about, run
