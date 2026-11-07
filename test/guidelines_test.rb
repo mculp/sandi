@@ -5,7 +5,7 @@ require_relative "test_helper"
 
 # Sandi's guidelines: comments put to Jev, here a fake one on localhost, and counted in the same ratchet as the rules.
 # A ratchet has to count the same tree the same way every time, so what decides a count, and what it costs, matters.
-class GuidelinesTest < SandiCase
+module GuidelinesFixtures
   COUNTER = <<~RUBY
     class Counter
       # Adds one to the count.
@@ -15,8 +15,54 @@ class GuidelinesTest < SandiCase
     end
   RUBY
 
+  ADD_METHOD = "  def add\n    @count += 1\n  end\n"
+
+  DECLINES_TWO = proc { |state, _name| state["comment"] == "Returns 2." ? nil : 0.1 }
+
+  TALLY = <<~RUBY
+    # frozen_string_literal: true
+    # rubocop:disable Metrics/MethodLength
+
+    # Loads what it needs.
+    require "json"
+
+    # A count of what a file breaks.
+    class Tally
+      # How many there may be.
+      LIMIT = 4
+
+      # Adds one to the total.
+      def add
+        # Bump the total.
+        @total += 1 # by one
+      end
+
+      # Floats on its own.
+
+      def total = @total
+    end
+  RUBY
+
+  CART = <<~RUBY
+    class Cart
+      # rubocop:disable Metrics/AbcSize
+      # Sums the cart, before tax.
+      # rubocop:disable Metrics/MethodLength
+      def total = @items.sum(&:price)
+
+      # rubocop:disable Metrics/AbcSize
+      def count = @items.size
+    end
+  RUBY
+end
+
+module GuidelinesSupport
+  include GuidelinesFixtures
+
   def judgments = JSON.parse(File.read(File.join(@root, ".sandi-judgments.json")))
   def asked = @jev.requests.map { |request| request.body.dig("state", "comment") }
+
+  def asked_code = @jev.requests.first.body.dig("state", "code")
 
   # A tree whose one comment Jev is asked about, with the WhatComment guideline on.
   def counter(yes:)
@@ -26,11 +72,57 @@ class GuidelinesTest < SandiCase
     rubocop_reports("lib/counter.rb" => [])
   end
 
+  def counter_judged_by(*names)
+    guidelines(*names)
+    jev_says_yes_to("Adds one to the count.")
+    write("lib/counter.rb", COUNTER)
+    rubocop_reports("lib/counter.rb" => [])
+  end
+
+  def unnamed_counter
+    jev_says_yes_to("Adds one to the count.")
+    write("lib/counter.rb", COUNTER)
+    record("lib/counter.rb" => [])
+  end
+
+  def uncomment_counter
+    write("lib/counter.rb", COUNTER.sub("  # Adds one to the count.\n", ""))
+  end
+
+  def learn_then_uncomment
+    counter(yes: true)
+    uncomment_counter
+    assert_equal 0, sandi("--update", "--allow-increase")
+  end
+
+  def counter_then_uncommented
+    counter(yes: false)
+    assert_equal 0, sandi("--update")
+    uncomment_counter
+  end
+
+  def counted_once
+    counter(yes: true)
+    assert_equal 1, sandi
+  end
+
+  def first_request
+    counter(yes: false)
+    sandi
+    @jev.requests.first
+  end
+
   # A file of methods, each under a comment that says what it returns: "Returns 1." and so on.
   def numbers(count)
     methods = (1..count).map { |number| "# Returns #{number}.\ndef number#{number} = #{number}\n" }
     write("lib/many.rb", methods.join("\n"))
     rubocop_reports("lib/many.rb" => [])
+  end
+
+  def judge_numbers(count, &answer)
+    guidelines("WhatComment")
+    jev(&answer)
+    numbers(count)
   end
 
   # A method of `length` lines with the comment "Totals the cart." on its own line, the one at `at`.
@@ -41,10 +133,56 @@ class GuidelinesTest < SandiCase
     rubocop_reports("lib/long.rb" => [])
   end
 
+  def long_method_asked(at:)
+    guidelines("WhatComment")
+    jev_says_yes_to("Totals the cart.")
+    long_method(length: 153, at: at)
+    sandi
+  end
+
+  def edit_counter(from, to)
+    @jev.requests.clear
+    write("lib/counter.rb", COUNTER.sub(from, to))
+  end
+
+  def learned_then_edited
+    counter(yes: true)
+    assert_equal 0, sandi("--update", "--allow-increase")
+    before = baseline
+    edit_counter("Adds one", "Adds two")
+    before
+  end
+
+  def tally_script
+    script("bin/tally", TALLY)
+    rubocop_reports("bin/tally" => [])
+  end
+
+  def judged_tree(path, source)
+    guidelines("WhatComment")
+    jev_says_yes_to
+    write(path, source)
+    rubocop_reports(path => [])
+  end
+
+  def cart_asked
+    guidelines("WhatComment")
+    jev_says_yes_to("Sums the cart, before tax.")
+    write("lib/cart.rb", CART)
+    rubocop_reports("lib/cart.rb" => [])
+  end
+end
+
+class GuidelinesTest < SandiCase
+  include GuidelinesSupport
+
+  def counted_then_jev_changes_its_mind
+    counted_once
+    jev_says_yes_to
+  end
+
   def test_guidelines_are_off_unless_the_project_names_them
-    jev_says_yes_to("Adds one to the count.")
-    write("lib/counter.rb", COUNTER)
-    record("lib/counter.rb" => [])
+    unnamed_counter
     assert_empty @jev.requests
     refute_includes @out, "guidelines"
     refute_includes baseline, "guidelines"
@@ -66,9 +204,7 @@ class GuidelinesTest < SandiCase
   end
 
   def test_a_new_comment_jev_says_yes_to_fails_and_is_pointed_to
-    counter(yes: true)
-    write("lib/counter.rb", COUNTER.sub("  # Adds one to the count.\n", ""))
-    assert_equal 0, sandi("--update", "--allow-increase")
+    learn_then_uncomment
     write("lib/counter.rb", COUNTER)
     assert_equal 1, sandi
     assert_includes @out, "worse: lib/counter.rb WhatComment 0 -> 1"
@@ -76,9 +212,7 @@ class GuidelinesTest < SandiCase
   end
 
   def test_a_rerun_asks_jev_nothing_and_counts_what_it_said_before_even_if_it_would_now_say_otherwise
-    counter(yes: true)
-    assert_equal 1, sandi
-    jev_says_yes_to
+    counted_then_jev_changes_its_mind
     assert_equal 1, sandi
     assert_empty @jev.requests
     assert_includes @out, "guidelines: 1 (WhatComment 1) in 1 of 1 files"
@@ -88,124 +222,9 @@ class GuidelinesTest < SandiCase
   def test_a_comment_is_asked_about_again_when_the_code_under_it_changes
     counter(yes: false)
     assert_equal 0, sandi
-    @jev.requests.clear
-    write("lib/counter.rb", COUNTER.sub("+= 1", "+= 2"))
+    edit_counter("+= 1", "+= 2")
     sandi
     assert_equal ["Adds one to the count."], asked
-  end
-
-  def test_only_the_comments_a_reader_reads_are_asked_about
-    guidelines("WhatComment")
-    jev_says_yes_to
-    script("bin/tally", <<~RUBY)
-      # frozen_string_literal: true
-      # rubocop:disable Metrics/MethodLength
-
-      # Loads what it needs.
-      require "json"
-
-      # A count of what a file breaks.
-      class Tally
-        # How many there may be.
-        LIMIT = 4
-
-        # Adds one to the total.
-        def add
-          # Bump the total.
-          @total += 1 # by one
-        end
-
-        # Floats on its own.
-
-        def total = @total
-      end
-    RUBY
-    rubocop_reports("bin/tally" => [])
-    sandi
-    assert_equal ["A count of what a file breaks.", "Adds one to the total.", "Bump the total."], asked.sort
-  end
-
-  def test_a_directive_beside_a_comment_is_left_out_of_it_but_does_not_separate_it_from_its_def
-    guidelines("WhatComment")
-    jev_says_yes_to("Sums the cart, before tax.")
-    write("lib/cart.rb", <<~RUBY)
-      class Cart
-        # rubocop:disable Metrics/AbcSize
-        # Sums the cart, before tax.
-        # rubocop:disable Metrics/MethodLength
-        def total = @items.sum(&:price)
-
-        # rubocop:disable Metrics/AbcSize
-        def count = @items.size
-      end
-    RUBY
-    rubocop_reports("lib/cart.rb" => [])
-    assert_equal 1, sandi
-    state = {"comment" => "Sums the cart, before tax.", "code" => "  def total = @items.sum(&:price)\n"}
-    assert_equal [state], @jev.requests.map { |request| request.body["state"] }
-    assert_includes @out, "lib/cart.rb:3 WhatComment 0.9"
-  end
-
-  def test_a_comment_deep_in_a_long_method_is_asked_with_the_lines_around_it
-    guidelines("WhatComment")
-    jev_says_yes_to("Totals the cart.")
-    long_method(length: 153, at: 122)
-    sandi
-    code = @jev.requests.first.body.dig("state", "code")
-    assert_includes code, "# Totals the cart."
-    assert_equal Sandi::Source::LINES, code.lines.size
-  end
-
-  def test_a_comment_near_the_end_of_a_long_method_is_asked_with_its_last_lines
-    guidelines("WhatComment")
-    jev_says_yes_to("Totals the cart.")
-    long_method(length: 153, at: 150)
-    sandi
-    code = @jev.requests.first.body.dig("state", "code")
-    assert_includes code, "# Totals the cart."
-    assert_equal "end\n", code.lines.last
-    assert_equal Sandi::Source::LINES, code.lines.size
-  end
-
-  def test_a_comment_near_the_top_of_a_long_method_is_asked_with_its_first_lines
-    guidelines("WhatComment")
-    jev_says_yes_to("Totals the cart.")
-    long_method(length: 153, at: 5)
-    sandi
-    code = @jev.requests.first.body.dig("state", "code")
-    assert_equal "def long\n", code.lines.first
-    assert_includes code, "# Totals the cart."
-    assert_equal Sandi::Source::LINES, code.lines.size
-  end
-
-  def test_jev_is_asked_with_the_key_the_pinned_model_and_the_comment_with_the_definition_it_documents
-    counter(yes: false)
-    sandi
-    request = @jev.requests.first
-    assert_equal "Bearer test-key", request.authorization
-    assert_equal "typesafe/jev-1.14", request.body["model"]
-    method = "  def add\n    @count += 1\n  end\n"
-    assert_equal({"comment" => "Adds one to the count.", "code" => method}, request.body["state"])
-    assert_equal "noul", request.body.dig("questions", "WhatComment", "type")
-  end
-
-  def test_a_comment_inside_a_method_is_asked_about_with_the_whole_method
-    guidelines("WhatComment")
-    jev_says_yes_to
-    write("lib/total.rb", "def total(items)\n  # Add them up.\n  items.sum\nend\n")
-    rubocop_reports("lib/total.rb" => [])
-    sandi
-    assert_equal "def total(items)\n  # Add them up.\n  items.sum\nend\n", @jev.requests.first.body.dig("state", "code")
-  end
-
-  def test_every_question_about_a_comment_goes_in_one_request_and_each_yes_counts
-    guidelines("WhatComment", "StaleComment")
-    jev_says_yes_to("Adds one to the count.")
-    write("lib/counter.rb", COUNTER)
-    rubocop_reports("lib/counter.rb" => [])
-    sandi
-    assert_equal [%w[StaleComment WhatComment]], @jev.requests.map { |request| request.body["questions"].keys.sort }
-    assert_includes @out, "guidelines: 2 (StaleComment 1, WhatComment 1) in 1 of 1 files"
   end
 
   def test_without_a_key_the_recorded_answers_still_count
@@ -216,19 +235,90 @@ class GuidelinesTest < SandiCase
     refute_includes @out, "lib/counter.rb:2"
   end
 
-  def test_more_comments_than_are_asked_at_once_are_all_asked
+  def test_the_summary_says_what_asking_jev_took
+    counter(yes: false)
+    sandi
+    assert_includes @out, "asked Jev (typesafe/jev-1.14) through OpenRouter 1 of 1 questions"
+    assert_includes @out, "120 input tokens"
+  end
+end
+
+class GuidelinesReadingTest < SandiCase
+  include GuidelinesSupport
+
+  def test_only_the_comments_a_reader_reads_are_asked_about
     guidelines("WhatComment")
-    jev { 0.9 }
-    numbers(20)
+    jev_says_yes_to
+    tally_script
+    sandi
+    assert_equal ["A count of what a file breaks.", "Adds one to the total.", "Bump the total."], asked.sort
+  end
+
+  def test_a_directive_beside_a_comment_is_left_out_of_it_but_does_not_separate_it_from_its_def
+    cart_asked
+    assert_equal 1, sandi
+    state = {"comment" => "Sums the cart, before tax.", "code" => "  def total = @items.sum(&:price)\n"}
+    assert_equal [state], @jev.requests.map { |request| request.body["state"] }
+    assert_includes @out, "lib/cart.rb:3 WhatComment 0.9"
+  end
+
+  def test_a_comment_deep_in_a_long_method_is_asked_with_the_lines_around_it
+    long_method_asked(at: 122)
+    code = asked_code
+    assert_includes code, "# Totals the cart."
+    assert_equal Sandi::Source::LINES, code.lines.size
+  end
+
+  def test_a_comment_near_the_end_of_a_long_method_is_asked_with_its_last_lines
+    long_method_asked(at: 150)
+    code = asked_code
+    assert_includes code, "# Totals the cart."
+    assert_equal "end\n", code.lines.last
+    assert_equal Sandi::Source::LINES, code.lines.size
+  end
+
+  def test_a_comment_near_the_top_of_a_long_method_is_asked_with_its_first_lines
+    long_method_asked(at: 5)
+    code = asked_code
+    assert_equal "def long\n", code.lines.first
+    assert_includes code, "# Totals the cart."
+    assert_equal Sandi::Source::LINES, code.lines.size
+  end
+
+  def test_jev_is_asked_with_the_key_the_pinned_model_and_the_comment_with_the_definition_it_documents
+    request = first_request
+    assert_equal "Bearer test-key", request.authorization
+    assert_equal "typesafe/jev-1.14", request.body["model"]
+    assert_equal({"comment" => "Adds one to the count.", "code" => ADD_METHOD}, request.body["state"])
+    assert_equal "noul", request.body.dig("questions", "WhatComment", "type")
+  end
+
+  def test_a_comment_inside_a_method_is_asked_about_with_the_whole_method
+    judged_tree("lib/total.rb", "def total(items)\n  # Add them up.\n  items.sum\nend\n")
+    sandi
+    assert_equal "def total(items)\n  # Add them up.\n  items.sum\nend\n", @jev.requests.first.body.dig("state", "code")
+  end
+
+  def test_every_question_about_a_comment_goes_in_one_request_and_each_yes_counts
+    counter_judged_by("WhatComment", "StaleComment")
+    sandi
+    assert_equal [%w[StaleComment WhatComment]], @jev.requests.map { |request| request.body["questions"].keys.sort }
+    assert_includes @out, "guidelines: 2 (StaleComment 1, WhatComment 1) in 1 of 1 files"
+  end
+end
+
+class GuidelinesFailureTest < SandiCase
+  include GuidelinesSupport
+
+  def test_more_comments_than_are_asked_at_once_are_all_asked
+    judge_numbers(20) { 0.9 }
     sandi
     assert_equal 20, @jev.requests.size
     assert_includes @out, "guidelines: 20 (WhatComment 20) in 1 of 1 files"
   end
 
   def test_the_key_of_each_judgment_is_worked_out_once
-    guidelines("WhatComment")
-    jev { 0.1 }
-    numbers(3)
+    judge_numbers(3) { 0.1 }
     digests = 0
     real = Digest::SHA256.method(:hexdigest)
     Digest::SHA256.stub(:hexdigest, ->(text) { digests += 1; real.call(text) }) { sandi }
@@ -244,9 +334,7 @@ class GuidelinesTest < SandiCase
   end
 
   def test_answers_to_the_other_requests_asked_at_once_are_kept_when_one_fails
-    guidelines("WhatComment")
-    jev { |state, _name| state["comment"] == "Returns 2." ? nil : 0.1 }
-    numbers(3)
+    judge_numbers(3, &DECLINES_TWO)
     assert_equal 2, sandi
     assert_equal 2, judgments.size
   end
@@ -259,9 +347,7 @@ class GuidelinesTest < SandiCase
   end
 
   def test_when_asking_fails_and_saving_fails_too_the_failure_to_ask_is_the_one_reported
-    guidelines("WhatComment")
-    jev { |state, _name| state["comment"] == "Returns 2." ? nil : 0.1 }
-    numbers(2)
+    judge_numbers(2, &DECLINES_TWO)
     read_only(".sandi-judgments.json", "{}\n")
     assert_equal 2, sandi
     assert_includes @err, "did not answer WhatComment"
@@ -294,6 +380,15 @@ class GuidelinesTest < SandiCase
     assert_equal 2, sandi
     assert_includes @err, "answered in a way sandi can't read"
   end
+end
+
+class GuidelinesAskingTest < SandiCase
+  include GuidelinesSupport
+
+  def assert_not_judged
+    assert_includes @out, "guidelines: not judged"
+    assert_includes @out, "OPENROUTER_API_KEY"
+  end
 
   def test_a_jev_url_without_a_path_is_asked_at_its_root
     counter(yes: true)
@@ -302,14 +397,9 @@ class GuidelinesTest < SandiCase
   end
 
   def test_without_a_key_a_comment_not_yet_judged_leaves_the_baseline_as_it_is_and_says_why
-    counter(yes: true)
-    assert_equal 0, sandi("--update", "--allow-increase")
-    before = baseline
-    @jev.requests.clear
-    write("lib/counter.rb", COUNTER.sub("Adds one", "Adds two"))
+    before = learned_then_edited
     assert_equal 0, sandi("--update", key: nil)
-    assert_includes @out, "guidelines: not judged"
-    assert_includes @out, "OPENROUTER_API_KEY"
+    assert_not_judged
     assert_equal before, baseline
     assert_empty @jev.requests
   end
@@ -338,19 +428,10 @@ class GuidelinesTest < SandiCase
   end
 
   def test_a_check_keeps_answers_the_tree_no_longer_uses_and_an_update_drops_them
-    counter(yes: false)
-    assert_equal 0, sandi("--update")
-    write("lib/counter.rb", COUNTER.sub("  # Adds one to the count.\n", ""))
+    counter_then_uncommented
     assert_equal 0, sandi
     assert_equal 1, judgments.size
     assert_equal 0, sandi("--update")
     assert_empty judgments
-  end
-
-  def test_the_summary_says_what_asking_jev_took
-    counter(yes: false)
-    sandi
-    assert_includes @out, "asked Jev (typesafe/jev-1.14) through OpenRouter 1 of 1 questions"
-    assert_includes @out, "120 input tokens"
   end
 end

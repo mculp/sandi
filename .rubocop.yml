@@ -1,8 +1,13 @@
-# sandi holds itself to its own rules.
+# sandi holds itself to its own rules, in all of its Ruby: the library, the executable, the tests and the project's own
+# files.
 inherit_from: config/sandi.yml
 
 AllCops:
   TargetRubyVersion: 3.3
   Include:
-    - exe/sandi
+    - exe/*
     - lib/**/*.rb
+    - test/**/*.rb
+    - Rakefile
+    - Gemfile
+    - "*.gemspec"

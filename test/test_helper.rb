@@ -7,10 +7,11 @@ require "stringio"
 require "tmpdir"
 require_relative "../lib/sandi"
 require_relative "fake_jev"
+require_relative "fake_model"
 
-# sandi against a tree in a temporary directory, a `rubocop` that reports what each test says and a Jev on localhost,
-# so that these tests need no gems and make no network calls. The ratchet is what keeps the design limits from slipping
-# back, so what it lets through matters.
+# sandi against a tree in a temporary directory, a `rubocop` that reports what each test says, and a Jev and a code
+# model on localhost, so that these tests need no gems and make no network calls. The ratchet is what keeps the design
+# limits from slipping back, so what it lets through matters.
 class SandiCase < Minitest::Test
   def setup
     @root = Dir.mktmpdir("sandi-")
@@ -20,11 +21,12 @@ class SandiCase < Minitest::Test
 
   def teardown
     @jev&.stop
+    @model&.stop
     FileUtils.remove_entry(@root)
   end
 
-  # What RuboCop will report: the cops that fired in each file it inspected, one name per offense. It only reports
-  # files it read, so they exist.
+  # Installs a `rubocop` that reports the cops that fired in each file, one name per offense. RuboCop only reports
+  # files it read, so each file is created, empty, unless the test has written it.
   def rubocop_reports(offenses)
     offenses.each_key { |path| write(path, "") unless File.exist?(File.join(@root, path)) }
     files = offenses.map { |path, cops| {"path" => path, "offenses" => cops.map { |cop| {"cop_name" => "Metrics/#{cop}"} }} }
@@ -32,8 +34,9 @@ class SandiCase < Minitest::Test
     install("rubocop", "printf '%s' '#{report}'\nexit #{offenses.values.flatten.empty? ? 0 : 1}")
   end
 
-  def install(name, script)
-    File.write(File.join(@tools, name), "#!/bin/sh\n#{script}\n")
+  # A tool on the PATH: a shell script, or a script for the interpreter `shell` names.
+  def install(name, script, shell: "/bin/sh")
+    File.write(File.join(@tools, name), "#!#{shell}\n#{script}\n")
     File.chmod(0o755, File.join(@tools, name))
   end
 
@@ -64,19 +67,30 @@ class SandiCase < Minitest::Test
   # A Jev that says yes (0.9) to every question about the comments given and no (0.1) to the rest.
   def jev_says_yes_to(*comments) = jev { |state, _name| comments.include?(state["comment"]) ? 0.9 : 0.1 }
 
-  # The exit status of `sandi *argv` with only the fake tools on the PATH, only the fake Jev to ask, at `url`, and `key`
-  # as the OpenRouter key, or none. Leaves what it said in @out and @err.
+  # A code model on localhost that answers each request with what the block gives for it. The first answers can be HTTP
+  # errors instead, one per status given, or whole replies of the test's own, one per reply.
+  def model(statuses: [], replies: [], &content)
+    @model&.stop
+    @model = FakeModel.new(statuses: statuses, replies: replies, &content)
+  end
+
+  # The exit status of `sandi *argv` with only the fake tools on the PATH, only the fake Jev and the fake model to ask,
+  # the Jev at `url`, and `key` as the OpenRouter key, or none. Leaves what it said in @out and @err.
   def sandi(*argv, key: "test-key", url: jev_url)
     out, err = StringIO.new, StringIO.new
-    status = with_env("PATH" => @tools, "OPENROUTER_API_KEY" => key, "SANDI_JEV_URL" => url) do
-      Sandi::CLI.new(argv, root: @root, out: out, err: err).call
-    end
+    status = with_env(sandi_env(key, url)) { Sandi::CLI.new(argv, root: @root, out: out, err: err).call }
     @out, @err = out.string, err.string
     status
   end
 
+  # The environment `sandi` runs in: the fake tools and nothing else on the PATH, and the fake services to ask.
+  def sandi_env(key, url)
+    {"PATH" => @tools, "OPENROUTER_API_KEY" => key, "SANDI_JEV_URL" => url, "SANDI_AUTOCORRECT_URL" => model_url}
+  end
+
   # Nowhere, when the test started no Jev: a call fails rather than reach the real one.
   def jev_url = @jev ? @jev.url : "http://127.0.0.1:1/api/v1/systemone"
+  def model_url = @model ? @model.url : "http://127.0.0.1:1/api/v1/chat/completions"
 
   # A nil value unsets the variable for the block.
   def with_env(variables)

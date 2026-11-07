@@ -33,13 +33,35 @@ class SandiTest < SandiCase
   end
 
   def test_a_file_that_no_longer_offends_has_improved_and_may_not_offend_again
-    record("lib/a.rb" => %w[MethodLength], "lib/b.rb" => %w[ClassLength])
-    rubocop_reports("lib/a.rb" => [], "lib/b.rb" => %w[ClassLength])
+    lib_a_is_fixed
     assert_equal 0, sandi("--update")
     assert_includes @out, "improved: lib/a.rb MethodLength 1 -> 0"
-    rubocop_reports("lib/a.rb" => %w[MethodLength], "lib/b.rb" => %w[ClassLength])
+    lib_a_offends_again
     assert_equal 1, sandi
   end
+
+  private
+
+  def lib_a_is_fixed
+    record("lib/a.rb" => %w[MethodLength], "lib/b.rb" => %w[ClassLength])
+    rubocop_reports("lib/a.rb" => [], "lib/b.rb" => %w[ClassLength])
+  end
+
+  def lib_a_offends_again
+    rubocop_reports("lib/a.rb" => %w[MethodLength], "lib/b.rb" => %w[ClassLength])
+  end
+end
+
+# Rule 4: an entry point may call methods on at most one constant, and the count may not rise.
+class SandiEntryPointTest < SandiCase
+  ENTRY_POINT_SOURCE = <<~RUBY
+    OptionParser.new
+    Giraffe::Config.load(JSON.parse(File.read(ARGV.first)))
+    Giraffe::Config.save
+    def helper = Harness.new
+    Giraffe::Run.start(Giraffe::Config, ENV.fetch("HOME"))
+    raise Failure, "unreachable"
+  RUBY
 
   def test_an_entry_point_calling_methods_on_more_constants_than_recorded_fails
     script("bin/tool", "Config.load\nTickets.load\n")
@@ -58,23 +80,14 @@ class SandiTest < SandiCase
   end
 
   def test_a_new_entry_point_may_call_methods_on_one_constant_and_no_more
-    script("bin/one", "Harness.new(ARGV).run\n")
-    script("bin/two", "Config.load\nTickets.load\n")
-    rubocop_reports("bin/one" => [], "bin/two" => [])
+    two_entry_points
     assert_equal 1, sandi
     assert_includes @out, "worse: bin/two Constants 0 -> 2"
     refute_includes @out, "bin/one Constants"
   end
 
   def test_constants_count_once_by_full_path_and_only_when_called_on_outside_a_method
-    script("bin/tool", <<~RUBY)
-      OptionParser.new
-      Giraffe::Config.load(JSON.parse(File.read(ARGV.first)))
-      Giraffe::Config.save
-      def helper = Harness.new
-      Giraffe::Run.start(Giraffe::Config, ENV.fetch("HOME"))
-      raise Failure, "unreachable"
-    RUBY
+    script("bin/tool", ENTRY_POINT_SOURCE)
     rubocop_reports("bin/tool" => [])
     sandi("--update", "--allow-increase")
     assert_includes @out, "entry points over 1 constant (rule 4): bin/tool 2"
@@ -88,6 +101,17 @@ class SandiTest < SandiCase
     assert_includes @out, "entry points over 1 constant (rule 4): none"
   end
 
+  private
+
+  def two_entry_points
+    script("bin/one", "Harness.new(ARGV).run\n")
+    script("bin/two", "Config.load\nTickets.load\n")
+    rubocop_reports("bin/one" => [], "bin/two" => [])
+  end
+end
+
+# The baseline is only ever tightened, or raised with an explicit flag.
+class SandiUpdateTest < SandiCase
   def test_update_on_an_unchanged_tree_leaves_the_baseline_alone
     script("bin/tool", "Config.load\nTickets.load\n")
     record("bin/tool" => [], "lib/a.rb" => %w[MethodLength])
@@ -112,9 +136,8 @@ class SandiTest < SandiCase
   end
 
   def test_update_refuses_to_raise_a_count
-    record("lib/a.rb" => %w[MethodLength])
+    lib_a_rises
     before = baseline
-    rubocop_reports("lib/a.rb" => %w[MethodLength MethodLength])
     assert_equal 1, sandi("--update")
     assert_equal before, baseline
     assert_includes @out, "--allow-increase"
@@ -127,6 +150,16 @@ class SandiTest < SandiCase
     assert_equal 0, sandi
   end
 
+  private
+
+  def lib_a_rises
+    record("lib/a.rb" => %w[MethodLength])
+    rubocop_reports("lib/a.rb" => %w[MethodLength MethodLength])
+  end
+end
+
+# Failures in the tool's environment, inputs and flags are reported with a reason, not a crash.
+class SandiFailureTest < SandiCase
   def test_a_missing_rubocop_says_how_to_install_it
     assert_equal 2, sandi
     assert_includes @err, "gem install rubocop -v 1.87.0 --no-document"
