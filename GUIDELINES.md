@@ -45,8 +45,8 @@ their counts as a draft until they are.
 
 ### Comments
 
-They read a comment written for a reader, sent with the code it is about: the class, module or def it documents, or
-the method it sits in. The state is `{"comment": ..., "code": ...}`.
+They read a comment written for people to read, not for tools, sent with the code it is about: the class, module or
+def it documents, or the method it sits in. The state is `{"comment": ..., "code": ...}`.
 
 **WhatComment**: *Is the comment a note inside a method that only says what the lines after it do?*
 Practical Object-Oriented Design in Ruby (POODR), chapter 2. A comment that narrates a bit of code inside a method is a
@@ -197,3 +197,5 @@ Some of her advice can be counted, and belongs with the rules:
 2. Calibrate the six method guidelines the way the comment guidelines were, and turn each on for sandi once it is.
 3. Add HiddenStructure, OneJob and ConceptName. Methods are read already, so each needs only a calibrated question.
 4. Add classes, then tests.
+5. Read the comments after code on the same line, which StaleComment could judge, and the methods made without `def`,
+   such as with `define_method`, which RuboCop's MethodLength already counts.

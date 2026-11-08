@@ -2,12 +2,12 @@
 
 require "json"
 require "prism"
-require "yaml"
 require_relative "errors"
+require_relative "instructions"
 require_relative "open_router"
 
 module Sandi
-  # A code model, through OpenRouter, asked to rewrite a Ruby file so that the offenses counted in it are gone. What it
+  # A code model, through OpenRouter, asked to rewrite a Ruby file so that what counts against it is gone. What it
   # answers is only a candidate: the caller keeps it if it checks out, so a bad rewrite costs a request and no more.
   class Rewriter
     # A reply with no Ruby in it. That is a bad try, not a failure to ask.
@@ -15,16 +15,16 @@ module Sandi
 
     MODEL = "anthropic/claude-haiku-5.5"
     URL = "https://openrouter.ai/api/v1/chat/completions"
-    INSTRUCTIONS = YAML.safe_load_file(File.expand_path("../../config/autocorrect.yml", __dir__)).fetch("instructions")
     # Room for a whole file, which is what the model gives back.
     MAX_TOKENS = 32_000
     CODE = /```(?:ruby)?\n(.*)```/m
 
     attr_reader :model
 
-    # SANDI_AUTOCORRECT_URL sends the requests somewhere else, such as the fake model the tests run.
-    def initialize(model = MODEL, env = ENV)
-      @model = model
+    # The model is told the rules and the `guidelines` the project asks about. SANDI_AUTOCORRECT_URL sends the requests
+    # somewhere else, such as the fake model the tests run.
+    def initialize(model = MODEL, guidelines: [], env: ENV)
+      @model, @instructions = model, Instructions.new(guidelines).to_s
       @router = OpenRouter.new(env.fetch("SANDI_AUTOCORRECT_URL", URL), description, read_timeout: 300, env: env)
       @requests, @tokens_in, @tokens_out, @cost = 0, 0, 0, 0.0
     end
@@ -40,8 +40,8 @@ module Sandi
              description, @requests, ("s" unless @requests == 1), @tokens_in, @tokens_out, @cost)
     end
 
-    # The file's source rewritten so that its offenses are gone, given what is wrong with it and, when an earlier try
-    # was rejected, why.
+    # The file's source rewritten so that what is wrong with it is gone, given what that is and, when an earlier try was
+    # rejected, why.
     def rewrite(path, source, problems, why)
       reply = JSON.parse(@router.post(JSON.generate(request(path, source, problems, why))))
       raise TypeError, "the reply is not a JSON object" unless reply.is_a?(Hash)
@@ -53,7 +53,7 @@ module Sandi
     private
 
     def request(path, source, problems, why)
-      system = {"role" => "system", "content" => INSTRUCTIONS}
+      system = {"role" => "system", "content" => @instructions}
       user = {"role" => "user", "content" => brief(path, source, problems, why)}
       {"model" => @model, "max_tokens" => MAX_TOKENS, "usage" => {"include" => true}, "messages" => [system, user]}
     end
@@ -61,7 +61,7 @@ module Sandi
     def brief(path, source, problems, why)
       rejected = "Your last rewrite was rejected: #{why}\nTry again from the file as it is below.\n\n" if why
       listing = problems.map { |problem| "- #{problem}" }.join("\n")
-      "#{rejected}File: #{path}\n\nOffenses:\n#{listing}\n\n```ruby\n#{source}```"
+      "#{rejected}File: #{path}\n\nWhat is wrong with it:\n#{listing}\n\n```ruby\n#{source}```"
     end
 
     def code(reply)

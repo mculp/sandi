@@ -5,8 +5,8 @@ guidelines:
   - WhatComment
   - StaleComment
 
-# `bundle exec exe/sandi --autocorrect` asks these models, in turn, to rewrite the files that break a rule, and keeps a
-# rewrite only if the counts fall, no method is lost and the tests pass.
+# `bundle exec exe/sandi --autocorrect` asks these models, in turn, to rewrite the files that break a rule or a
+# guideline, and keeps a rewrite only if the counts fall, no method is lost and the tests pass.
 autocorrect:
   test: bundle exec rake test
   model:

@@ -43,6 +43,17 @@ class AutocorrectSetupTest < SandiCase
     assert_equal({"include" => true}, sent.body["usage"])
   end
 
+  def test_the_model_is_told_the_rules
+    autocorrect { fenced(QUICK) }
+    ["A class or module is at most 100 lines.", "A method is at most 5 lines.", "A method takes at most 4 parameters",
+     "A script that is an entry point builds one object"].each { |rule| assert_includes told, rule }
+  end
+
+  def test_when_the_project_asks_about_no_guideline_the_model_is_told_none
+    autocorrect { fenced(QUICK) }
+    refute_includes told, "judgment model"
+  end
+
   def test_the_model_asked_is_the_one_the_project_names
     autocorrect(sandi_yml: "#{TESTED}  model: openai/gpt-6.1-terra\n") { fenced(QUICK) }
     assert_equal "openai/gpt-6.1-terra", @model.requests.first.body["model"]

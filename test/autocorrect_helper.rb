@@ -35,6 +35,15 @@ module AutocorrectHelper
   QUICK = "def total = 1\n"
   BROKEN = "def total = 1 # BROKEN\n"
   TESTED = "autocorrect:\n  test: project-tests\n"
+  # A comment inside a method that only says what the line under it does, the same with an offense beside it, the same
+  # with the line changed, a second file with another such comment, a method with two, and the settings that ask about
+  # such comments.
+  NARRATED = "def total\n  # add one\n  1\nend\n"
+  BOTH = "def total\n  # add one\n  LONG\n  1\nend\n"
+  CHANGED = "def total\n  # add one\n  2\nend\n"
+  OTHER = "def other\n  # add two\n  2\nend\n"
+  TWO_NARRATED = "def total\n  # add one\n  1\n  # add two\n  2\nend\n"
+  GUIDED = "guidelines:\n  - WhatComment\n#{TESTED}"
 
   def fenced(code) = "```ruby\n#{code}```"
 
@@ -49,6 +58,9 @@ module AutocorrectHelper
 
   # What was sent to the model, one string for each request.
   def asked = @model.requests.map { |request| request.body["messages"].map { |message| message["content"] }.join("\n") }
+
+  # What the model is told before it is sent the file, which is the same in every request.
+  def told = @model.requests.first.body["messages"].first["content"]
 
   # The reply for the request being answered: the first of these for the first request, the second for the rest.
   def first_then(first, rest) = fenced(@model.requests.size == 1 ? first : rest)
@@ -71,6 +83,20 @@ module AutocorrectHelper
   def autocorrect(source = SLOW, sandi_yml: TESTED, &reply)
     project(source, sandi_yml)
     model(&reply)
+    sandi("--autocorrect")
+  end
+
+  # A project with WhatComment on, a Jev that says yes to the comment "add one" and to no other, and a model that
+  # answers as the block says.
+  def guided_project(source = NARRATED, &reply)
+    jev_says_yes_to("add one")
+    project(source, GUIDED)
+    model(&reply)
+  end
+
+  # `sandi --autocorrect` run on a guided project: its exit status.
+  def guided(source = NARRATED, &reply)
+    guided_project(source, &reply)
     sandi("--autocorrect")
   end
 end

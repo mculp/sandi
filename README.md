@@ -21,8 +21,8 @@ Most code doesn't meet them yet. `sandi` records each file's counts in `.sandi-b
 count rises or a file the baseline lacks has an offense. Counts can fall and never rise. Its first line is the
 progress to quote in a PR, and it names the files that improved.
 
-`sandi --autocorrect` can fix what it counts: it asks a code model to rewrite the files that break a rule, and keeps a
-rewrite only if it checks out. See [Autocorrect](#autocorrect).
+`sandi --autocorrect` can fix what it counts: it asks a code model to rewrite the files that break a rule or a
+guideline, and keeps a rewrite only if it checks out. See [Autocorrect](#autocorrect).
 
 ## Install
 
@@ -57,7 +57,7 @@ Run it from the project's root:
 bundle exec sandi                                # 0: no count rose, 1: one did, 2: couldn't count or misused
 bundle exec sandi --update                       # write today's counts as the baseline; refuses to raise one
 bundle exec sandi --update --allow-increase      # write them even if a count rose
-bundle exec sandi --autocorrect                  # first rewrite the files that break a rule, then do the above
+bundle exec sandi --autocorrect                  # first rewrite the files that break a rule or guideline, then check
 ```
 
 A PR doesn't have to touch the baseline, which keeps parallel PRs from conflicting. Tighten it after merges with
@@ -85,18 +85,35 @@ guidelines:
 
 Each guideline reads one kind of place, and is asked about every place of that kind:
 
-- **A comment**, for WhatComment and StaleComment: every comment written for a reader, which is one just above a
+- **A comment**, for WhatComment and StaleComment: every comment written for people to read, which is one just above a
   `class`, `module` or `def`, or on its own lines inside a method. It is sent with the code it is about, the definition
-  it sits above or the method it is in. Shebangs, magic comments, `rubocop:` directives and comments after code on the
-  same line are skipped, and so is a comment above anything else, such as a constant. A directive between a comment and
-  the definition under it doesn't separate them.
+  it sits above or the method it is in. A directive between a comment and the definition under it doesn't separate
+  them.
 - **A method**, for the other six: every `def`, wherever it is defined, whether in a class or module, in
   `class << self`, in a block or at the top of a script. It is sent as its own source, from `def` to `end`, as though
   it began its line, so nothing else on its line goes with it.
 
-Jev judges worse as what it reads grows, so what it is sent stops at 100 lines, a class's worth: the first 100, or for a
-comment further into a longer method, the 100 around it. The questions are in `config/guidelines.yml`, and
-[GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still to come.
+Jev judges worse as what it reads grows, so what it is sent is one definition, never the whole file, and stops at 100
+lines: the first 100, or for a comment further into a longer method, the 100 around it. Sandi's rules hold a class to
+100 lines and a method to 5, so for code that follows them this cuts nothing. The questions are in
+`config/guidelines.yml`, and [GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still to
+come.
+
+#### What isn't read
+
+The advice behind each guideline is Sandi Metz's, and GUIDELINES.md gives the chapter. Which places to put to Jev is
+sandi's own choice, not hers, and it leaves these out:
+
+- **Comments written for tools**: a shebang, a magic comment such as `# frozen_string_literal: true`, and a `rubocop:`
+  directive. They speak to a program, so there is nothing in them for a guideline to judge.
+- **A comment after code on the same line**, as in `retries = 3 # three tries`. This is a limit, not a principle. No
+  reason for leaving these out was written down when sandi started reading comments, and StaleComment could judge them.
+  WhatComment's question is worded for a comment above the lines it describes, which a trailing comment is not.
+- **A comment that is neither just above a `class`, `module` or `def` nor inside a method**, such as one above a
+  constant or a `require`, or one on its own in a class body. This is a limit too: a stale comment above a constant goes
+  unnoticed. GUIDELINES.md lists reading them first among what to build next.
+- **A method made without `def`**, such as with `define_method`. RuboCop does count a `define_method` block, so rule 2
+  applies to it, but the six method guidelines read only `def`.
 
 ### Answers
 
@@ -112,8 +129,10 @@ guidelines: 3 (Demeter 1, StaleComment 1, WhatComment 1) in 1 of 1 files
 asked Jev (typesafe/jev-1.14) through OpenRouter 9 of 9 questions in 0.5s: 600 input tokens, about $0.00003
 ```
 
-Jev is pinned to a version, `typesafe/jev-1.14`, rather than the `jev-latest` alias, so a new Jev can't change the
-counts under a baseline. Moving to a new version asks every question again.
+Jev is pinned to a version, `typesafe/jev-1.14`, rather than the `jev-latest` alias, which moves to each release. The
+record below is keyed by model, so under the alias its old answers would stay valid while new questions went to a newer
+Jev, and one tree would be judged by two. A pin keeps the record one model's. Moving to a new version asks every
+question again.
 
 ### The record
 
@@ -141,19 +160,29 @@ six method questions haven't been calibrated yet, so treat their first counts as
 
 ## Autocorrect
 
-RuboCop can't autocorrect Sandi's rules: shortening a method is a design decision, not a substitution. So
-`sandi --autocorrect` asks a code model, through OpenRouter and with the same key as Jev, to rewrite each file that
-counts against a rule, and then checks what it gets rather than trusting it. A rewrite is kept only if
+RuboCop can't autocorrect Sandi's rules: shortening a method is a design decision, not a substitution. Nor can it reword
+a comment that only repeats the code. So `sandi --autocorrect` asks a code model, through OpenRouter and with the same
+key as Jev, to rewrite each file that counts against a rule or a guideline, and then checks what it gets rather than
+trusting it.
 
-- the file's count falls, and no kind of offense rises;
+The model is told the four rules and every guideline the project turns on, each with the question Jev is asked, what a
+yes and a no to it mean and, for WhatComment and StaleComment, how to put a yes right. It is then sent the file and a
+line for each thing wrong with it: an offense RuboCop reports, or a comment or method Jev said yes to, with its line,
+how it begins and the question that was answered yes. A rewrite is kept only if
+
+- the file's count falls, and no kind of count rises, whether an offense or a guideline;
 - every method the file defined is still defined, so a failing test can't be fixed by deleting it; and
 - the project's tests still pass.
 
 Otherwise the rewrite is thrown away, the model is told why, and it tries again. Each model gets three tries at a file.
 What is kept is built on: a rewrite that fixes some of the offenses counts, and the next try starts from it, so a file
 that can't be fixed in one step is fixed in several. When the tries are used up, the file is as the last kept rewrite
-made it, or as it was. It fixes the four rules and leaves guidelines alone: a comment Jev counts against is for its
-author to reword. It rewrites only code RuboCop measures, so put your tests under `Include` to have them fixed too.
+made it, or as it was.
+
+A rewrite is judged as the ratchet will judge it. Jev is asked about the comments and methods of the file that changed,
+and its answers are recorded in `.sandi-judgments.json` like any other, so a rewrite that shortens a method but narrates
+it in a comment is thrown away too. It rewrites only code RuboCop measures, so put your tests under `Include` to have
+them fixed too.
 
 Say how in `.sandi.yml`:
 
@@ -179,9 +208,22 @@ autocorrect: fixed 1 of 1 files
 asked anthropic/claude-haiku-5.5 through OpenRouter 3 requests: 14000 input tokens, 11000 output tokens, about $0.0069
 ```
 
+With guidelines on, the same loop puts comments right. This file had a method of six lines, a comment its code
+contradicted, and four that only restated the code. The first try extracted two methods named for what the comments
+said, corrected the stale comment, deleted the rest, and left the unflagged class comment alone:
+
+```text
+autocorrect: lib/cart.rb MethodLength 1, StaleComment 1, WhatComment 4
+  anthropic/claude-haiku-5.5 try 1: kept: 6 -> 0 offenses
+autocorrect: fixed 1 of 1 files
+asked anthropic/claude-haiku-5.5 through OpenRouter 1 request: 1624 input tokens, 856 output tokens, about $0.0006
+asked Jev (typesafe/jev-1.14) through OpenRouter 4 questions in 0.3s: 1275 input tokens, about $0.00005
+```
+
 A file that is only partly fixed says so, as `partly fixed: lib/a.rb has 2 left`, and a file nothing could fix says
 `not fixed: lib/a.rb is as it was`. Run it on a clean tree, so that `git diff` shows only what it changed, and read that
-diff before you commit it: tests can pass while code stops meaning what it did.
+diff before you commit it: tests can pass while code stops meaning what it did, and a comment worth keeping can be
+deleted without any count rising.
 
 ## Develop
 

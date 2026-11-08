@@ -1,9 +1,11 @@
-# What sandi asks a code model to do with a file that counts against Sandi Metz's rules. The model is sent this first, and
-# then the file, what RuboCop says is wrong with it and, when an earlier try was rejected, why. Nothing the model says is
-# trusted: a rewrite is kept only if it takes offenses away, adds none of another kind and leaves the project's tests
+# What sandi tells a code model about a file that counts against Sandi Metz's rules or against the guidelines a project
+# asks about. The model is told `rules`, then `guidelines` and what each guideline the project names asks, then `how`,
+# and is then sent the file, what is wrong with it and, when an earlier try was rejected, why. Nothing the model says is
+# trusted: a rewrite is kept only if it takes counts away, adds none of another kind and leaves the project's tests
 # passing, so what is written here steers the model and the checks decide.
-instructions: |-
-  You rewrite one Ruby file so that it meets Sandi Metz's rules, and you change nothing else about what it does.
+rules: |-
+  You rewrite one Ruby file so that it meets Sandi Metz's rules, and any guidelines given below, and you change nothing
+  else about what it does.
 
   The rules, as RuboCop's Metrics cops count them in lines of code, not comments or blank lines:
   - A class or module is at most 100 lines.
@@ -11,8 +13,18 @@ instructions: |-
   - A method takes at most 4 parameters, keyword arguments included.
   - A script that is an entry point builds one object: outside any method it calls methods on at most one constant.
 
-  You are given the file and the offenses RuboCop reports in it. Rewrite the file so that none of them remain and no
-  offense of another kind appears.
+# Said once, before the guidelines the project asks about, each of which follows with its question, what a yes and a no
+# to it mean, and where there is one, how to put a yes right (`fixes`, below).
+guidelines: |-
+  The guidelines are questions that a judgment model answers about one comment or one method in the file, phrased so
+  that yes is the finding. In a question, `comment` is the comment, `code` is the class, module or method it is about
+  or in, and `method` is a method's own source. A place that gets a yes counts against the file, as an offense does.
+  Put a yes right by changing that comment or method so that the question would be answered no, and never by changing
+  what the code does. Where a fix is given, follow it. This project asks:
+
+how: |-
+  You are given the file and what is wrong with it, a line for each. Rewrite the file so that none of it remains and
+  nothing of another kind appears.
 
   How:
   - Extract small methods named for what they do, instead of long bodies. When a method takes too many parameters, group
@@ -22,7 +34,16 @@ instructions: |-
   - Keep every method the file defines, by name, and what each one does: a rewrite that no longer defines one is
     rejected. In a test file keep every test and every assertion, and what each one checks. Never delete or weaken a
     test to make it shorter.
-  - Keep comments that say why. Write none that only say what the code does.
-  - Add no dependencies and change no requires. Touch nothing outside this file.
+  - Keep comments that say why. Write none that only say what the code does. Leave every comment that nothing was found
+    in as it is, moving it with the code it describes.
+  - Add no dependencies and change no requires. Add no `rubocop:disable` comments. Touch nothing outside this file.
 
   Answer with the complete rewritten file in one ```ruby block, and nothing else.
+
+# How to put a yes right, for the guidelines where the question and its criteria don't make it plain.
+fixes:
+  WhatComment: >-
+    Extract the lines the comment describes into a method named for what it says, and delete the comment. When the code
+    already says as much, just delete the comment.
+  StaleComment: >-
+    Make the comment true of the code, or delete it. Never change what the code does to match a comment.

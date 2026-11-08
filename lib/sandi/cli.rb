@@ -54,26 +54,28 @@ module Sandi
     def update? = @argv.include?("--update")
     def allow_increase? = @argv.include?("--allow-increase")
 
-    # The rules' counters, which read the files as they are now.
-    def rules
+    # The counters of the rules and of the guidelines .sandi.yml turns on, which read the files as they are now. `judge`
+    # answers the guidelines.
+    def counters(judge)
       offenses = Offenses.new(Rubocop.new(@root).report)
-      [offenses, EntryPoints.new(offenses.paths, root: @root)]
+      [offenses, EntryPoints.new(offenses.paths, root: @root), *guidelines(offenses.paths, judge)]
     end
 
-    def ratchet
-      offenses, entry_points = rules
-      Ratchet.new([offenses, entry_points, *guidelines(offenses.paths)], baseline, @out)
-    end
+    def ratchet = Ratchet.new(counters(judge(prune: update?)), baseline, @out)
 
-    # The files that count against a rule, rewritten by the models .sandi.yml names where a rewrite checks out.
+    # The files that count against a rule or a guideline, rewritten by the models .sandi.yml names where a rewrite
+    # checks out. Jev judges the rewrites with a record that is never pruned: a rewrite thrown away puts its file back,
+    # and the answers that file goes back to must still be there.
     def autocorrect
       how = settings.autocorrect
       raise Error, NEEDS_TESTS unless how.test
-      Autocorrect.new(rewriters(how), Checks.new(@root, -> { rules }, how.test), @out).call
+      judging = judge(prune: false)
+      Autocorrect.new(rewriters(how), Checks.new(@root, -> { counters(judging) }, how.test), @out).call
+      @out.puts(judging.spent) if judging.asked?
     end
 
     def rewriters(how)
-      all = how.models.map { |model| Rewriter.new(model) }
+      all = how.models.map { |model| Rewriter.new(model, guidelines: settings.guidelines) }
       raise Error, "autocorrect asks #{all.first.description}, and #{all.first.unready}" unless all.first.ready?
       all
     end
@@ -81,13 +83,14 @@ module Sandi
     def settings = @settings ||= Settings.new(File.join(@root, SETTINGS))
 
     # The guidelines .sandi.yml turns on, if any, asked of the comments or methods in the files RuboCop inspected.
-    def guidelines(paths)
+    def guidelines(paths, judge)
       chosen = settings.guidelines
       return [] if chosen.empty?
       [Guidelines.new(chosen, Places.new(paths, root: @root), judge, baseline: baseline.tally(Guidelines::NAME))]
     end
 
-    def judge = Judge.new(Jev.new, Judgments.new(File.join(@root, JUDGMENTS), prune: update?))
+    # Jev's answers are kept in a record that drops the ones the tree no longer uses only when `prune` says to.
+    def judge(prune:) = Judge.new(Jev.new, Judgments.new(File.join(@root, JUDGMENTS), prune: prune))
     def baseline = @baseline ||= Baseline.new(File.join(@root, BASELINE))
 
     def help

@@ -16,5 +16,9 @@ module Sandi
     def question = guideline.question
     def state = place.state
     def key(model) = Digest::SHA256.hexdigest(JSON.generate([model, question, state]))
+
+    # What a yes says is wrong, for whoever puts it right: where it is, which guideline, how the place begins and the
+    # question that was answered yes.
+    def problem = "line #{line}: #{name}: #{place.first_line.inspect}: #{guideline.instructions}"
   end
 end

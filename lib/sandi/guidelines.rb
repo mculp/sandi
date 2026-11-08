@@ -21,6 +21,14 @@ module Sandi
     def tally = @tally ||= judged? ? Tally.new(yeses.keys.map(&:counts_against).tally) : @baseline
     def summary = judged? ? [counts, *pointers, @judge.report(judgments)] : unjudged
 
+    # What each yes in a file says is wrong with it, a line for each in the order of the file. None when nothing was
+    # judged.
+    def problems(path)
+      return [] unless judged?
+      found = yeses.keys.select { |judgment| judgment.file == path }
+      found.sort_by { |judgment| [judgment.line, judgment.name] }.map(&:problem)
+    end
+
     private
 
     def judged? = @judge.able?(judgments)
