@@ -4,9 +4,9 @@ require "digest"
 require "json"
 
 module Sandi
-  # A guideline asked of a place in the code, a comment or a method. Its answer is recorded under a digest of everything
-  # the answer depends on, so that it is used again for the same state, question and model, and for nothing else. No
-  # state holds a line number, so a place that only moves keeps its answer.
+  # A guideline asked of a place in the code, a comment or a method. Its answer is recorded under a digest of the model,
+  # the question and the state, so that it is used again for those three and for nothing else. The state holds no line
+  # number, so a place that only moves keeps its answer.
   Judgment = Data.define(:place, :guideline) do
     def file = place.file
     def line = place.line
