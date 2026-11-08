@@ -17,12 +17,12 @@ module Sandi
         raise(Error, "sandi has no guideline #{name}. It has #{all.map(&:name).join(", ")}")
     end
 
-    attr_reader :name, :about
+    attr_reader :name, :abouts
 
-    # An entry says what kind of place its guideline is about, a comment unless it names another. That is not part of
-    # the question, so it isn't sent to Jev or digested into the key of an answer.
+    # An entry says what kinds of place its guideline is about, one or a list, a comment unless it names others. That is
+    # not part of the question, so it isn't sent to Jev or digested into the key of an answer.
     def initialize(name, entry)
-      @name, @about, @question = name, entry.fetch("about", "comment"), entry.except("about")
+      @name, @abouts, @question = name, Array(entry.fetch("about", "comment")), entry.except("about")
     end
 
     # A noul question: Jev answers it with the probability that the answer is yes.

@@ -3,13 +3,14 @@
 require_relative "comments"
 require_relative "methods"
 require_relative "source"
+require_relative "trailing_comments"
 
 module Sandi
   # The places in the files RuboCop inspected that a guideline can be asked about, by the kind of place it reads: each
-  # comment written for a reader, or each method. The files are read for a kind of place only when a guideline asks, and
-  # each is parsed once, however many kinds of place ask.
+  # comment written for a reader, each comment after code on its line, or each method. The files are read for a kind of
+  # place only when a guideline asks, and each is parsed once, however many kinds of place ask.
   class Places
-    FINDERS = {"comment" => Comments, "method" => Methods}.freeze
+    FINDERS = {"comment" => Comments, "trailing comment" => TrailingComments, "method" => Methods}.freeze
 
     def initialize(paths, root:)
       @paths, @root, @found = paths, root, {}

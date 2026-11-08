@@ -8,7 +8,7 @@ module Sandi
   # other statement, such as a constant or a require, is about that statement, and one anywhere else in a statement is
   # about the smallest statement that holds it. Shebangs, magic comments and rubocop: directives are written for tools,
   # so they are left out of a comment, though one between a comment and the code under it doesn't separate them. A
-  # comment after code on its line is left alone, and so is one that no statement holds.
+  # comment after code on its line is TrailingComments's, and one that no statement holds is not read.
   class Comments
     Comment = Data.define(:file, :line, :text, :code) do
       # What Jev reads to answer a question about the comment.
@@ -42,7 +42,8 @@ module Sandi
 
     # Comment lines next to each other, each on a line of its own, are one comment.
     def paragraphs = own_lines.slice_when { |above, below| line(below) != line(above) + 1 }
-    def own_lines = @source.comments.select { |comment| comment.is_a?(Prism::InlineComment) && !comment.trailing? }
+    def own_lines = inline.reject(&:trailing?)
+    def inline = @source.comments.grep(Prism::InlineComment)
     def for_tools?(comment) = comment.location.slice.match?(DIRECTIVE) || magic?(comment)
     def magic?(comment) = @source.magic_comments.any? { |magic| magic.key_loc.start_line == line(comment) }
 

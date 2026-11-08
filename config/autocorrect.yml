@@ -17,8 +17,9 @@ rules: |-
 # to it mean, and where there is one, how to put a yes right (`fixes`, below).
 guidelines: |-
   The guidelines are questions that a judgment model answers about one comment or one method in the file, phrased so
-  that yes is the finding. In a question, `comment` is the comment, `code` is the class, module or method it is about
-  or in, and `method` is a method's own source. A place that gets a yes counts against the file, as an offense does.
+  that yes is the finding. In a question, `comment` is the comment, `code` is the class, module, method or statement it
+  is about or in, and `method` is a method's own source. A place that gets a yes counts against the file, as an offense
+  does.
   Put a yes right by changing that comment or method so that the question would be answered no, and never by changing
   what the code does. Where a fix is given, follow it. This project asks:
 
