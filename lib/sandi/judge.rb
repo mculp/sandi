@@ -14,6 +14,7 @@ module Sandi
     end
 
     def description = @jev.description
+    def asked? = @asked.positive?
 
     # True when the record holds every answer or Jev can be asked for the rest.
     def able?(judgments) = @jev.ready? || unrecorded(judgments).empty?
@@ -30,9 +31,11 @@ module Sandi
     # What asking took, the way the rules' counters say what they counted.
     def report(judgments)
       return "asked Jev nothing: all #{judgments.size} answers were recorded" if @asked.zero?
-      format("asked %s %d of %d questions in %.1fs: %d input tokens, about $%.5f",
-             description, @asked, judgments.size, @seconds, @tokens, @tokens * @jev.price)
+      "asked #{description} #{@asked} of #{judgments.size} questions #{took}"
     end
+
+    # What asking took so far, for a run that judges again and again, as autocorrect does with each rewrite.
+    def spent = "asked #{description} #{@asked} question#{"s" unless @asked == 1} #{took}"
 
     def excuse(judgments)
       "#{unrecorded(judgments).size} of #{judgments.size} questions have no recorded answer and #{@jev.unready}"
@@ -42,6 +45,7 @@ module Sandi
 
     def unrecorded(judgments) = judgments.reject { |judgment| @judgments.noul(key(judgment)) }
     def key(judgment) = keys[judgment] ||= judgment.key(@jev.model)
+    def took = format("in %.1fs: %d input tokens, about $%.5f", @seconds, @tokens, @tokens * @jev.price)
 
     # By identity, so that looking one up doesn't hash the comment and its code again.
     def keys = @keys ||= {}.compare_by_identity

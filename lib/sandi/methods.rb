@@ -10,6 +10,9 @@ module Sandi
     Method = Data.define(:file, :line, :column, :code) do
       # What Jev reads to answer a question about the method.
       def state = {"method" => code}
+
+      # How a message points at the method, beside its line.
+      def first_line = code[/.*/].strip
     end
 
     def initialize(source)

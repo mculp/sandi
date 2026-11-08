@@ -11,6 +11,9 @@ module Sandi
     Comment = Data.define(:file, :line, :text, :code) do
       # What Jev reads to answer a question about the comment.
       def state = {"comment" => text, "code" => code}
+
+      # How a message points at the comment, beside its line.
+      def first_line = text.strip[/.*/].strip
     end
     DEFINITIONS = %i[class_node module_node singleton_class_node def_node].freeze
     DIRECTIVE = /\A#(!|\s*rubocop:)/

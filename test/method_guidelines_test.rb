@@ -6,7 +6,7 @@ require_relative "test_helper"
 # Sandi's guidelines about methods: each def put to Jev, here a fake one on localhost, with its source as the state.
 # They count in the same ratchet as the rules and the guidelines about comments, and each guideline is asked only about
 # the kind of place it reads.
-class MethodGuidelinesTest < SandiCase
+module MethodGuidelinesFixtures
   CART = <<~RUBY
     class Cart
       # The items in the cart.
@@ -22,7 +22,39 @@ class MethodGuidelinesTest < SandiCase
   # What Jev reads about each of the cart's methods: its own source, as though it began its line.
   INITIALIZE = "def initialize(items)\n  @items = items\nend"
   TOTAL = "def total\n  @items.map(&:price).sum\nend"
+  CART_WITHOUT_TOTAL = CART.sub("\n  def total\n    @items.map(&:price).sum\n  end\n", "")
+  MOVED_CART = "# frozen_string_literal: true\n\n#{CART}"
   FROM_THE_BOOKS = %w[AskForWhat Demeter InjectDependency TypeSwitch FlagParameter NullCheck].freeze
+  REPORT = <<~RUBY
+    Row = Data.define(:name) do
+      def to_s = name
+    end
+
+    module Format
+      class << self
+        def plain(row) = row.to_s
+      end
+
+      def self.loud(row) = row.to_s.upcase
+    end
+
+    def report(rows)
+      rows.map { |row| Format.loud(row) }
+    end
+  RUBY
+  SHOP = <<~RUBY
+    Item = Struct.new(:price) { def to_s = price.to_s }
+    class Shelf; def size = 3; def empty? = size.zero?; end
+    class Basket
+      private def subtotal
+        @items.sum(&:price)
+      end
+    end
+  RUBY
+end
+
+module MethodGuidelinesHelpers
+  include MethodGuidelinesFixtures
 
   # The cart, with the guidelines named turned on and a Jev that says yes (0.9) to every question about the methods
   # given and no (0.1) to the rest.
@@ -42,6 +74,54 @@ class MethodGuidelinesTest < SandiCase
     pairs.sort_by { |state, _names| JSON.generate(state) }
   end
 
+  def demeter_says(score)
+    guidelines("Demeter")
+    jev { score }
+  end
+
+  def sandi_reads(path, content)
+    demeter_says(0.1)
+    write(path, content)
+    rubocop_reports(path => [])
+    sandi
+  end
+
+  def record_baseline(files)
+    files.each { |path, content| write(path, content) }
+    rubocop_reports(**files.transform_values { [] })
+    sandi("--update", "--allow-increase")
+  end
+
+  def ask_then_forget
+    sandi
+    @jev.requests.clear
+  end
+
+  def ask_and_forget
+    sandi
+    refute_empty @jev.requests
+    @jev.requests.clear
+  end
+
+  def method_states(sources) = sources.map { |source| {"method" => source} }
+
+  def assert_noul(name, question)
+    assert_equal "noul", question["type"], name
+    assert_includes question["instructions"], "`method`", name
+    assert_equal %w[false true], question["criteria"].keys.sort, name
+    refute question.key?("about"), "#{name}: what a guideline is about is sandi's to know, not Jev's"
+  end
+
+  def assert_total_is_worse
+    assert_equal 1, sandi
+    assert_includes @out, "worse: lib/cart.rb Demeter 0 -> 1"
+    assert_includes @out, "lib/cart.rb:7 Demeter 0.9"
+  end
+end
+
+class MethodGuidelinesTest < SandiCase
+  include MethodGuidelinesHelpers
+
   def test_a_file_is_parsed_once_however_many_kinds_of_place_are_asked_about
     cart("WhatComment", "Demeter")
     parses = 0
@@ -57,68 +137,30 @@ class MethodGuidelinesTest < SandiCase
   end
 
   def test_every_def_is_asked_about_wherever_it_is_defined
-    guidelines("Demeter")
-    jev { 0.1 }
-    write("lib/report.rb", <<~RUBY)
-      Row = Data.define(:name) do
-        def to_s = name
-      end
-
-      module Format
-        class << self
-          def plain(row) = row.to_s
-        end
-
-        def self.loud(row) = row.to_s.upcase
-      end
-
-      def report(rows)
-        rows.map { |row| Format.loud(row) }
-      end
-    RUBY
-    rubocop_reports("lib/report.rb" => [])
-    sandi
+    sandi_reads("lib/report.rb", REPORT)
     sources = ["def plain(row) = row.to_s", "def report(rows)\n  rows.map { |row| Format.loud(row) }\nend",
                "def self.loud(row) = row.to_s.upcase", "def to_s = name"]
-    assert_equal(sources.map { |source| {"method" => source} }, states)
+    assert_equal(method_states(sources), states)
   end
 
   def test_a_def_is_sent_as_its_own_source_without_the_code_it_shares_a_line_with
-    guidelines("Demeter")
-    jev { 0.1 }
-    write("lib/shop.rb", <<~RUBY)
-      Item = Struct.new(:price) { def to_s = price.to_s }
-      class Shelf; def size = 3; def empty? = size.zero?; end
-      class Basket
-        private def subtotal
-          @items.sum(&:price)
-        end
-      end
-    RUBY
-    rubocop_reports("lib/shop.rb" => [])
-    sandi
+    sandi_reads("lib/shop.rb", SHOP)
     sources = ["def empty? = size.zero?", "def size = 3", "def subtotal\n  @items.sum(&:price)\nend",
                "def to_s = price.to_s"]
-    assert_equal(sources.map { |source| {"method" => source} }, states)
+    assert_equal(method_states(sources), states)
   end
 
   def test_each_def_counts_even_beside_one_on_its_line_that_reads_the_same
-    guidelines("Demeter")
-    jev { 0.9 }
+    demeter_says(0.9)
     twins = "class Order; def name = @order.owner.name; end; class Gift; def name = @order.owner.name; end\n"
-    write("lib/names.rb", twins)
-    rubocop_reports("lib/names.rb" => [])
-    assert_equal 0, sandi("--update", "--allow-increase")
+    assert_equal 0, record_baseline("lib/names.rb" => twins)
     assert_includes @out, "guidelines: 2 (Demeter 2) in 1 of 1 files"
   end
 
   def test_methods_that_read_the_same_are_asked_about_once_and_each_counts
-    guidelines("Demeter")
-    jev { 0.9 }
-    write("lib/order.rb", "class Order\n  def owner_name = @order.owner.name\nend\n")
-    write("lib/gift.rb", "def owner_name = @order.owner.name\n")
-    rubocop_reports("lib/order.rb" => [], "lib/gift.rb" => [])
-    assert_equal 0, sandi("--update", "--allow-increase")
+    demeter_says(0.9)
+    assert_equal 0, record_baseline("lib/order.rb" => "class Order\n  def owner_name = @order.owner.name\nend\n",
+                                    "lib/gift.rb" => "def owner_name = @order.owner.name\n")
     assert_equal [{"method" => "def owner_name = @order.owner.name"}], states
     assert_includes @out, "guidelines: 2 (Demeter 2) in 2 of 2 files"
   end
@@ -145,49 +187,44 @@ class MethodGuidelinesTest < SandiCase
     expected = [[comment, %w[WhatComment]], [{"method" => INITIALIZE}, %w[Demeter]], [{"method" => TOTAL}, %w[Demeter]]]
     assert_equal expected, asked
   end
+end
+
+class MethodGuidelinesRatchetTest < SandiCase
+  include MethodGuidelinesHelpers
 
   def test_a_new_method_jev_says_yes_to_fails_and_is_pointed_to_at_its_def
     cart("Demeter", yes: [TOTAL])
-    write("lib/cart.rb", CART.sub("\n  def total\n    @items.map(&:price).sum\n  end\n", ""))
+    write("lib/cart.rb", CART_WITHOUT_TOTAL)
     assert_equal 0, sandi("--update", "--allow-increase")
     write("lib/cart.rb", CART)
-    assert_equal 1, sandi
-    assert_includes @out, "worse: lib/cart.rb Demeter 0 -> 1"
-    assert_includes @out, "lib/cart.rb:7 Demeter 0.9"
+    assert_total_is_worse
   end
 
   def test_a_method_that_only_moves_is_not_asked_about_again
     cart("Demeter")
-    sandi
-    refute_empty @jev.requests
-    @jev.requests.clear
-    write("lib/cart.rb", "# frozen_string_literal: true\n\n#{CART}")
+    ask_and_forget
+    write("lib/cart.rb", MOVED_CART)
     sandi
     assert_empty @jev.requests
   end
 
   def test_a_method_whose_source_changes_is_asked_about_again
     cart("Demeter")
-    sandi
-    @jev.requests.clear
+    ask_then_forget
     write("lib/cart.rb", CART.sub("map(&:price).sum", "sum(&:price)"))
     sandi
     assert_equal [{"method" => "def total\n  @items.sum(&:price)\nend"}], states
   end
 
   def test_a_method_longer_than_a_class_is_sent_up_to_a_class_worth_of_lines
-    guidelines("Demeter")
-    jev { 0.1 }
-    write("lib/long.rb", "def long\n#{"  step\n" * 120}end\n")
-    rubocop_reports("lib/long.rb" => [])
-    sandi
+    sandi_reads("lib/long.rb", "def long\n#{"  step\n" * 120}end\n")
     assert_equal [{"method" => "def long\n#{"  step\n" * 99}"}], states
   end
 
   def test_the_baseline_says_which_guidelines_were_asked_of_comments_and_which_of_methods
     cart("WhatComment", "StaleComment", "Demeter")
     assert_equal 0, sandi("--update", "--allow-increase")
-    counter =JSON.parse(baseline).dig("guidelines", "counter")
+    counter = JSON.parse(baseline).dig("guidelines", "counter")
     assert_includes counter, "WhatComment, StaleComment asked of comments"
     assert_includes counter, "Demeter asked of methods"
   end
@@ -202,11 +239,6 @@ class MethodGuidelinesTest < SandiCase
     cart(*FROM_THE_BOOKS)
     sandi
     refute_empty @jev.requests
-    @jev.requests.first.body["questions"].each do |name, question|
-      assert_equal "noul", question["type"], name
-      assert_includes question["instructions"], "`method`", name
-      assert_equal %w[false true], question["criteria"].keys.sort, name
-      refute question.key?("about"), "#{name}: what a guideline is about is sandi's to know, not Jev's"
-    end
+    @jev.requests.first.body["questions"].each { |name, question| assert_noul(name, question) }
   end
 end

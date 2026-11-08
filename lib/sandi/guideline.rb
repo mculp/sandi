@@ -27,5 +27,11 @@ module Sandi
 
     # A noul question: Jev answers it with the probability that the answer is yes.
     def question = {"type" => "noul"}.merge(@question)
+
+    # The question in words, which a yes answers.
+    def instructions = @question.fetch("instructions")
+
+    # What a yes and a no to the question mean, as {"true" => ..., "false" => ...}.
+    def criteria = @question.fetch("criteria")
   end
 end

@@ -19,6 +19,12 @@ module Sandi
     def tally = @tally ||= Tally.new(over_the_limit.to_h { |path, count| [[path, "Constants"], count] })
     def summary = "entry points over #{LIMIT} constant (rule 4): #{listing}"
 
+    # What is wrong with a script that builds too many objects, as a line for each: none for any other file.
+    def problems(path)
+      return [] unless over_the_limit.key?(path)
+      ["calls methods on #{over_the_limit[path]} distinct constants outside any method; the limit is #{LIMIT}"]
+    end
+
     private
 
     # Only the entry points over the limit, as {path => constants}: within it there is nothing to ratchet.
