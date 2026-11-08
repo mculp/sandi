@@ -14,8 +14,8 @@ module CommentPlacesHelpers
     rubocop_reports("lib/a.rb" => [])
   end
 
-  # What Jev was sent for the tree: each state with the names of the questions about it, in any order, since requests
-  # are in flight at once.
+  # What Jev was sent for the tree: each state with the names of the questions about it, sorted, since requests are in
+  # flight at once and arrive in any order.
   def requests_for(source, names)
     tree_of(source, names)
     sandi
@@ -72,6 +72,10 @@ class CommentPlacesTest < SandiCase
 
   def test_a_comment_that_no_statement_holds_or_sits_above_is_not_asked_about
     assert_empty asked_in("require \"json\"\n\n# Nothing holds this.\n\nrequire \"yaml\"\n")
+  end
+
+  def test_a_block_comment_between_begin_and_end_is_not_asked_about
+    assert_empty asked_in("=begin\nOld notes.\n=end\nLIMIT = 4\n")
   end
 end
 

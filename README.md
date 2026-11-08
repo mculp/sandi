@@ -72,7 +72,7 @@ guidelines on by name in `.sandi.yml`:
 ```yaml
 guidelines:
   - WhatComment       # a comment inside a method that only says what the lines after it do
-  - StaleComment      # a comment that the code under it contradicts
+  - StaleComment      # a comment that the code it is about contradicts
   - AskForWhat        # a method that tells another object how to do a job, step by step
   - Demeter           # a method that reaches through an object to that object's collaborators
   - InjectDependency  # a method that creates an object of a class it could be given instead
@@ -83,21 +83,28 @@ guidelines:
 
 ### Places
 
-Each guideline reads one kind of place, and is asked about every place of that kind:
+Each guideline reads some kinds of place, and is asked about every place of those kinds:
 
-- **A comment**, for WhatComment and StaleComment: every comment written for people to read, which is one just above a
-  `class`, `module` or `def`, or on its own lines inside a method. It is sent with the code it is about, the definition
-  it sits above or the method it is in. A directive between a comment and the definition under it doesn't separate
-  them.
-- **A method**, for the other six: every `def`, wherever it is defined, whether in a class or module, in
-  `class << self`, in a block or at the top of a script. It is sent as its own source, from `def` to `end`, as though
-  it began its line, so nothing else on its line goes with it.
+- **A comment**, for WhatComment and StaleComment: every comment written for people to read, on lines of its own. It is
+  sent with the code it is about, which is the first of these that applies:
+  1. the `class`, `module` or `def` just under it;
+  2. the method it is inside, a `def` or a block given to `define_method`;
+  3. the statement just under it, such as a constant, a `require` or an `attr_reader`; or
+  4. the smallest statement that holds it, such as the class that a comment between its methods floats in.
 
-Jev judges worse as what it reads grows, so what it is sent is one definition, never the whole file, and stops at 100
-lines: the first 100, or for a comment further into a longer method, the 100 around it. Sandi's rules hold a class to
-100 lines and a method to 5, so for code that follows them this cuts nothing. The questions are in
-`config/guidelines.yml`, and [GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still to
-come.
+  A directive between a comment and the code under it doesn't separate them.
+- **A comment after code on its line**, as in `retries = 3 # three tries`, for StaleComment alone. It is sent with the
+  method it is inside, or else the smallest statement that holds its line, which for that example is the line itself.
+- **A method**, for the other six: every `def` and every `define_method` call given a block, wherever it is defined,
+  whether in a class or module, in `class << self`, in a block or at the top of a script. It is sent as its own source,
+  from the start of the `def` or the call to its closing `end` or brace, as though it began its line, so nothing else on
+  its line goes with it.
+
+Jev judges worse as what it reads grows, so what it is sent is one definition or statement, never the whole file, and
+stops at 100 lines: the first 100, or for a comment further into something longer, the 100 around it. Sandi's rules
+hold a class to 100 lines and a method to 5, so for code that follows them this cuts nothing, except a statement outside
+any class that is longer than that, such as a constant. The questions are in `config/guidelines.yml`, and
+[GUIDELINES.md](GUIDELINES.md) says where each comes from and lists the guidelines still to come.
 
 #### What isn't read
 
@@ -106,14 +113,16 @@ sandi's own choice, not hers, and it leaves these out:
 
 - **Comments written for tools**: a shebang, a magic comment such as `# frozen_string_literal: true`, and a `rubocop:`
   directive. They speak to a program, so there is nothing in them for a guideline to judge.
-- **A comment after code on the same line**, as in `retries = 3 # three tries`. This is a limit, not a principle. No
-  reason for leaving these out was written down when sandi started reading comments, and StaleComment could judge them.
-  WhatComment's question is worded for a comment above the lines it describes, which a trailing comment is not.
-- **A comment that is neither just above a `class`, `module` or `def` nor inside a method**, such as one above a
-  constant or a `require`, or one on its own in a class body. This is a limit too: a stale comment above a constant goes
-  unnoticed. GUIDELINES.md lists reading them first among what to build next.
-- **A method made without `def`**, such as with `define_method`. RuboCop does count a `define_method` block, so rule 2
-  applies to it, but the six method guidelines read only `def`.
+- **A comment after code, for WhatComment.** Its question asks whether a comment says what the lines after it do, and it
+  was calibrated on comments above the lines they describe, which a comment after code is not. StaleComment's question
+  reads the same wherever the comment sits, so only StaleComment is asked about these.
+- **A comment that no statement holds or sits above**, such as a note on its own between top-level statements, or a
+  license at the top of a file. A guideline is asked about a comment together with the code it is about, and this one is
+  about none. A comment on its own inside a class or a block is read, as about the smallest statement that holds it.
+- **A comment between `=begin` and `=end`.** This is a limit: no reason for leaving these out was written down.
+- **A method made in another way than `def` or a `define_method` block**, such as with `define_singleton_method`. The
+  method guidelines read what RuboCop's `MethodLength` counts as a method, so that rule 2 and the guidelines agree on
+  what one is, and it counts only those two.
 
 ### Answers
 
@@ -156,7 +165,9 @@ uses.
 A question's wording decides its answers, so a guideline is calibrated before it counts: asked about labeled examples
 on each side of the line and about real code, to check that 0.7 separates them. WhatComment and StaleComment were
 calibrated against Jev on labeled examples and on sandi's own comments, as [GUIDELINES.md](GUIDELINES.md) describes. The
-six method questions haven't been calibrated yet, so treat their first counts as a draft.
+comments above a constant or another statement, and the ones after code that StaleComment reads, were checked afterwards
+on a smaller set of labeled examples, not calibrated as fully. The six method questions haven't been calibrated yet, so
+treat their first counts as a draft.
 
 ## Autocorrect
 
