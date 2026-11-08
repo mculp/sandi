@@ -43,6 +43,10 @@ module GuidelinesFixtures
     end
   RUBY
 
+  # The comments in TALLY that WhatComment is asked about, sorted.
+  TALLY_READ = ["A count of what a file breaks.", "Adds one to the total.", "Bump the total.", "Floats on its own.",
+                "How many there may be.", "Loads what it needs."].freeze
+
   CART = <<~RUBY
     class Cart
       # rubocop:disable Metrics/AbcSize
@@ -251,7 +255,7 @@ class GuidelinesReadingTest < SandiCase
     jev_says_yes_to
     tally_script
     sandi
-    assert_equal ["A count of what a file breaks.", "Adds one to the total.", "Bump the total."], asked.sort
+    assert_equal TALLY_READ, asked.sort
   end
 
   def test_a_directive_beside_a_comment_is_left_out_of_it_but_does_not_separate_it_from_its_def
