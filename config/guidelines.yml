@@ -1,13 +1,15 @@
 # Sandi Metz's guidelines: what she says about code that a parser can't check, put to Jev, TypeSafe's decision model,
-# as yes/no questions. Each is asked about one place in the code at a time, and `about` says which kind. A guideline
-# about a comment, the default, is asked about each comment written for a reader, with the code it is about, as the
-# state
+# as yes/no questions. Each is asked about one place in the code at a time, and `about` says which kinds, one or a
+# list. A guideline about a comment, the default, is asked about each comment written for a reader, with the code it is
+# about, as the state
 #
-#   {"comment": "the comment's text", "code": "the class, module or def it documents, or the method it is in"}
+#   {"comment": "the comment's text", "code": "the definition or statement it is about, or the method it is in"}
 #
-# and a guideline `about: method` is asked about each def, with its own source, as the state
+# and one about a `trailing comment` is asked about each comment after code on its line, in the same state, with the
+# method it is in or the statement it follows as the code. A guideline `about: method` is asked about each method, a
+# def or a block given to define_method, with its own source, as the state
 #
-#   {"method": "the def, from `def` to `end`, as though it began its line"}
+#   {"method": "the method, from `def` to `end`, as though it began its line"}
 #
 # Jev answers with a noul, the probability that the answer is yes. A yes counts against the file the place is in. A
 # project turns guidelines on by name in its .sandi.yml.
@@ -33,8 +35,11 @@ WhatComment:
       warning or a reference, or what the code means in the problem it solves.
 
 # Practical Object-Oriented Design in Ruby, chapter 2. Comments aren't executed, so they decay as the code changes
-# around them, and a comment that disagrees with the code misleads the readers who trust it.
+# around them, and a comment that disagrees with the code misleads the readers who trust it. Where the comment sits
+# doesn't change what the code can contradict, so this reads a comment after code as well as one above it. WhatComment
+# doesn't: it is worded for a comment above the lines it describes.
 StaleComment:
+  about: [comment, trailing comment]
   instructions: Does `code` contradict something `comment` says about it?
   criteria:
     "true": >-

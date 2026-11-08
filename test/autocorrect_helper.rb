@@ -32,17 +32,23 @@ module AutocorrectHelper
   SLOW = "def total\n  LONG\n  1\nend\n"
   TWICE = "def total\n  LONG\n  LONG\n  1\nend\n"
   FIVE = "def total\n#{"  LONG\n" * 5}  1\nend\n"
+  SLOW_BLOCK = "define_method(:total) do\n  LONG\n  1\nend\n"
+  QUICK_BLOCK = "define_method(:total) { 1 }\n"
+  COMPUTED = "define_method(name) do\n  LONG\n  1\nend\n"
   QUICK = "def total = 1\n"
   BROKEN = "def total = 1 # BROKEN\n"
   TESTED = "autocorrect:\n  test: project-tests\n"
-  # A comment inside a method that only says what the line under it does, the same with an offense beside it, the same
-  # with the line changed, a second file with another such comment, a method with two, and the settings that ask about
-  # such comments.
+  # What a guided project starts from: its one comment, `add one`, is the one Jev says yes to.
   NARRATED = "def total\n  # add one\n  1\nend\n"
+  # The same with an offense beside it.
   BOTH = "def total\n  # add one\n  LONG\n  1\nend\n"
+  # The same with the line changed.
   CHANGED = "def total\n  # add one\n  2\nend\n"
+  # A second file with another such comment.
   OTHER = "def other\n  # add two\n  2\nend\n"
+  # A method with two.
   TWO_NARRATED = "def total\n  # add one\n  1\n  # add two\n  2\nend\n"
+  # The settings that ask about such comments.
   GUIDED = "guidelines:\n  - WhatComment\n#{TESTED}"
 
   def fenced(code) = "```ruby\n#{code}```"

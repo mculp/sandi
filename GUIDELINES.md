@@ -35,9 +35,9 @@ Jev is built for fast, narrow judgments, the kind a reader makes in a second wit
 
 ## The guidelines sandi has
 
-Each guideline in `config/guidelines.yml` says what kind of place it reads with `about:`, `comment` by default or
-`method`, and is asked only about places of that kind. Every question about one place goes to Jev in one request, and
-places that read the same, such as one method in two files, share it.
+Each guideline in `config/guidelines.yml` says what kinds of place it reads with `about:`: `comment` by default,
+`trailing comment` or `method`, or a list of them. It is asked only about places of those kinds. Every question about
+one place goes to Jev in one request, and places that read the same, such as one method in two files, share it.
 
 WhatComment and StaleComment are calibrated against Jev, as [Calibration](#calibration) describes. The six method
 guidelines aren't yet: they were written when no OpenRouter key was available to ask Jev about examples, so treat
@@ -46,24 +46,28 @@ their counts as a draft until they are.
 ### Comments
 
 They read a comment written for people to read, not for tools, sent with the code it is about: the class, module or
-def it documents, or the method it sits in. The state is `{"comment": ..., "code": ...}`.
+def it documents, the method it sits in, or else the statement under it or around it, such as a constant, a `require`
+or the class that a comment between its methods floats in. The state is `{"comment": ..., "code": ...}`.
 
 **WhatComment**: *Is the comment a note inside a method that only says what the lines after it do?*
 Practical Object-Oriented Design in Ruby (POODR), chapter 2. A comment that narrates a bit of code inside a method is a
 method waiting to be extracted. Name the method for what the comment says, and the name can't drift from the code the
 way a comment can. Comments that give a reason, a constraint or a decision are things code can't say, and they stay. A
-comment above a class or method describes it rather than narrating it, so it doesn't count.
+comment above a class or method describes it rather than narrating it, so it doesn't count. It reads only comments on
+lines of their own: its question is about the lines after a comment, and it was calibrated on those.
 
 **StaleComment**: *Does the code contradict something the comment says about it?*
 POODR, chapter 2. Comments aren't executed, so they decay as code changes around them, and a comment that disagrees
 with the code misleads the readers who trust it. A claim about a method defined elsewhere doesn't count, since Jev
-can't see that method.
+can't see that method. It also reads a comment after code on its line, sent with the method it is in or the statement
+it follows, since where a comment sits doesn't change what the code can contradict.
 
 ### Methods
 
-They read a method: each `def`, wherever it is defined, sent with its own source from `def` to `end`, as though it
-began its line, so nothing else on its line goes with it. The state is `{"method": ...}`. A method within Sandi's
-second rule is sent whole, and one over 100 lines is cut off there.
+They read a method: each `def` and each `define_method` call given a block, which are the two that RuboCop's
+`MethodLength` counts, wherever it is defined. It is sent with its own source from the start of the `def` or the call
+to its closing `end` or brace, as though it began its line, so nothing else on its line goes with it. The state is
+`{"method": ...}`. A method within Sandi's second rule is sent whole, and one over 100 lines is cut off there.
 
 **AskForWhat**: *Does the method tell another object how to do a job step by step, rather than ask for what it wants?*
 POODR, chapter 4, on asking for "what" instead of telling "how". A trip that tells a mechanic to clean the bicycle,
@@ -126,11 +130,30 @@ What the calibration showed:
   from moving on its own, and the answer recorded first is the one that counts. A comment that scores near 0.7 is
   reworded, not asked about again until it passes.
 
-sandi runs both guidelines on its own comments, from the answers committed in `.sandi-judgments.json`: 108 questions
-about the 54 comments in its `lib/` and `exe/`. The first 78 took 1.9 seconds and about a tenth of a cent to ask. None
-counts, and the highest is 0.59, WhatComment on the comment above `counts_against` in `lib/sandi/judgment.rb`. CI
-replays the answers and needs no key, so a comment that changes shows as not judged until someone records its answers
-with `sandi --update`.
+The questions were later asked about two more kinds of place: comments above a constant or another statement, and
+comments after code. On November 7, 2026, a smaller check put 28 labeled examples to the same Jev, each three times:
+comments that the code contradicts, such as by a wrong number or a wrong name, and comments it agrees with. The
+comments after code went to StaleComment alone, and the ones above a statement to both questions.
+
+| | Caught | Missed | Correct no | False yes | Lowest labeled yes | Highest labeled no |
+| --- | --- | --- | --- | --- | --- | --- |
+| StaleComment, after code | 6 | 0 | 6 | 0 | 0.73 | 0.17 |
+| StaleComment, above a statement | 5 | 1 | 10 | 0 | 0.19 | 0.31 |
+| WhatComment, above a statement | 0 | 0 | 16 | 0 | none | 0.11 |
+
+- **0.7 still separates them for StaleComment.** It caught every stale comment after code, and the accurate ones stayed
+  under 0.2. Above a statement it missed one: "Matches a shebang line." over a regexp for a `rubocop:` directive, at
+  0.20, a claim that takes reading the pattern, which is the kind of miss described above.
+- **WhatComment said no to every comment above a statement,** as its question asks, including "Set the limit to ten."
+  over `LIMIT = 10`, which narrates the line under it (0.06).
+- **The examples were written to be clear-cut,** so this checks that the line holds, not how often Jev is right.
+
+sandi runs both guidelines on its own comments, from the answers committed in `.sandi-judgments.json`: 328 questions
+about the 164 comments in its Ruby files, which are the library, the executable, the tests and the project's own files.
+Asking 86 of them in one run took 2.1 seconds and about a tenth of a cent. None counts, and the highest is 0.69,
+WhatComment on the comment above `AutocorrectGuidelinesTest` in `test/autocorrect_guidelines_test.rb`. CI replays the
+answers and needs no key, so a comment that changes shows as not judged until someone records its answers with
+`sandi --update`.
 
 ## Guidelines to come
 
@@ -192,10 +215,7 @@ Some of her advice can be counted, and belongs with the rules:
 
 ## What to build next
 
-1. Read the comments above a constant, which sandi skips now: 10 of the 64 in its own code, among them the two above a
-   `Data.define`.
-2. Calibrate the six method guidelines the way the comment guidelines were, and turn each on for sandi once it is.
-3. Add HiddenStructure, OneJob and ConceptName. Methods are read already, so each needs only a calibrated question.
-4. Add classes, then tests.
-5. Read the comments after code on the same line, which StaleComment could judge, and the methods made without `def`,
-   such as with `define_method`, which RuboCop's MethodLength already counts.
+1. Calibrate the six method guidelines the way the comment guidelines were, and turn each on for sandi once it is. They
+   read `define_method` blocks now, so the examples should include some.
+2. Add HiddenStructure, OneJob and ConceptName. Methods are read already, so each needs only a calibrated question.
+3. Add classes, then tests.

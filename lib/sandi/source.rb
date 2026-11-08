@@ -3,8 +3,8 @@
 require "prism"
 
 module Sandi
-  # A Ruby file, parsed once for the finders that read places in it, with what they share: its nodes, its comments and
-  # the lines of its source.
+  # A Ruby file, parsed once for the finders that read places in it, with what they share: its nodes, its statements,
+  # its comments and the lines of its source.
   class Source
     # Jev judges worse as its state grows, so the code sent with a place stops after a class's worth of lines: code within
     # the first rule is sent whole, and a method that long breaks the second rule many times over.
@@ -23,8 +23,31 @@ module Sandi
     def nodes = @nodes ||= walk(@parse.value)
     def lines = @lines ||= @parse.source.source.lines
 
+    # Every node that stands alone in a body: of the file, a class, a method, a block, an if, and so on.
+    def statements = @statements ||= nodes.select { |node| node.type == :statements_node }.flat_map(&:body)
+
+    # The nodes that make a method: a def, or a block given to define_method, which RuboCop's MethodLength counts too.
+    def method_nodes = @method_nodes ||= nodes.select { |node| node.type == :def_node || define_method?(node) }
+
+    # The lines a node is on, with the text of a heredoc in it, which comes after the line that opens the heredoc and so
+    # past where the node's own location ends.
+    def span(node) = node.location.start_line..[node.location.end_line, *heredoc_ends(node)].max
+
     private
 
     def walk(node) = [node, *node.compact_child_nodes.flat_map { |child| walk(child) }]
+
+    # A call to define_method with a block to run. One passed a block with & has no body of its own to read.
+    def define_method?(node)
+      node.type == :call_node && node.name == :define_method && node.block.is_a?(Prism::BlockNode)
+    end
+
+    def heredoc_ends(node)
+      inside = heredocs.select { |heredoc| offsets(node).cover?(offsets(heredoc)) }
+      inside.map { |heredoc| heredoc.closing_loc.start_line }
+    end
+
+    def heredocs = @heredocs ||= nodes.select { |node| node.respond_to?(:heredoc?) && node.heredoc? }
+    def offsets(node) = node.location.start_offset...node.location.end_offset
   end
 end
