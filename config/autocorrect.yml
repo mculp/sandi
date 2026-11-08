@@ -32,9 +32,9 @@ how: |-
     the ones that belong together into a named object. Do not hide parameters to get under the limit: no splats, options
     hashes or arrays that carry what are really several arguments.
   - Split a class over 100 lines into smaller classes or modules in the same file, moving what they share into a module.
-  - Keep every method the file defines, by name, and what each one does: a rewrite that no longer defines one is
-    rejected. In a test file keep every test and every assertion, and what each one checks. Never delete or weaken a
-    test to make it shorter.
+  - Keep every method the file defines, a def or a block given to define_method, by name, and what each one does: a
+    rewrite that no longer defines one is rejected. In a test file keep every test and every assertion, and what each
+    one checks. Never delete or weaken a test to make it shorter.
   - Keep comments that say why. Write none that only say what the code does. Leave every comment that nothing was found
     in as it is, moving it with the code it describes.
   - Add no dependencies and change no requires. Add no `rubocop:disable` comments. Touch nothing outside this file.

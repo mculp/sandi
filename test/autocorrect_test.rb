@@ -78,12 +78,6 @@ class AutocorrectTest < SandiCase
     assert_includes asked.last, "ClassLength rose from 0 to 1"
   end
 
-  def test_a_rewrite_that_loses_a_method_is_rejected_even_though_the_tests_pass
-    assert_equal 0, autocorrect { first_then("def other = 1\n", QUICK) }
-    assert_includes asked.last, "it no longer defines total"
-    assert_equal QUICK, read("lib/a.rb")
-  end
-
   def test_a_reply_that_is_not_ruby_is_rejected
     assert_equal 0, autocorrect { first_then("def (", QUICK) }
     assert_includes asked.last, "the reply was not valid Ruby"

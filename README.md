@@ -120,9 +120,10 @@ sandi's own choice, not hers, and it leaves these out:
   license at the top of a file. A guideline is asked about a comment together with the code it is about, and this one is
   about none. A comment on its own inside a class or a block is read, as about the smallest statement that holds it.
 - **A comment between `=begin` and `=end`.** This is a limit: no reason for leaving these out was written down.
-- **A method made in another way than `def` or a `define_method` block**, such as with `define_singleton_method`. The
-  method guidelines read what RuboCop's `MethodLength` counts as a method, so that rule 2 and the guidelines agree on
-  what one is, and it counts only those two.
+- **A method made in another way than `def` or a `define_method` block**, such as with `define_singleton_method`, or
+  with `define_method` given a block through `&`, which has no body of its own to read. The method guidelines read what
+  RuboCop's `MethodLength` counts as a method, so that rule 2 and the guidelines agree on what one is, and it counts
+  only those. Autocorrect's check that every method is still defined counts the same ones.
 
 ### Answers
 
@@ -182,7 +183,9 @@ line for each thing wrong with it: an offense RuboCop reports, or a comment or m
 how it begins and the question that was answered yes. A rewrite is kept only if
 
 - the file's count falls, and no kind of count rises, whether an offense or a guideline;
-- every method the file defined is still defined, so a failing test can't be fixed by deleting it; and
+- every method the file defined is still defined, so a failing test can't be fixed by deleting it, where a method is
+  what the guidelines read, a `def` or a block given to `define_method` ([what isn't read](#what-isnt-read) says what
+  that leaves out); and
 - the project's tests still pass.
 
 Otherwise the rewrite is thrown away, the model is told why, and it tries again. Each model gets three tries at a file.

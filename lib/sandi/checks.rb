@@ -57,9 +57,19 @@ module Sandi
       "it no longer defines #{gone.join(", ")}" unless gone.empty?
     end
 
-    # The methods a source defines, counted by name.
+    # How many times a source defines each method, whether with a def or with a block given to define_method.
     def defined_in(source)
-      Source.new("", Prism.parse(source)).nodes.select { |node| node.type == :def_node }.map(&:name).tally
+      parsed = Source.new("", Prism.parse(source))
+      parsed.method_nodes.map { |node| name_of(node) }.tally
+    end
+
+    # A def goes by its name. A define_method block goes by the symbol or string it is given, or, when that is computed,
+    # by the call as it is written.
+    def name_of(node)
+      return node.name if node.type == :def_node
+      named = node.arguments&.arguments&.first
+      return named.unescaped.to_sym if named.is_a?(Prism::SymbolNode) || named.is_a?(Prism::StringNode)
+      :"define_method(#{node.arguments&.slice})"
     end
 
     def failing_tests
