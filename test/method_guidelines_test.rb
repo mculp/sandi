@@ -51,6 +51,17 @@ module MethodGuidelinesFixtures
       end
     end
   RUBY
+  MAKER = <<~RUBY
+    class Maker
+      define_method(:total) do |items|
+        items.sum
+      end
+
+      define_method(:count) { |items| items.size }
+      singleton_class.define_method(:zero) { 0 }
+    end
+  RUBY
+  PASSED_ON = "class Copy\n  define_method(:copy, &:dup)\nend\n"
 end
 
 module MethodGuidelinesHelpers
@@ -148,6 +159,18 @@ class MethodGuidelinesTest < SandiCase
     sources = ["def empty? = size.zero?", "def size = 3", "def subtotal\n  @items.sum(&:price)\nend",
                "def to_s = price.to_s"]
     assert_equal(method_states(sources), states)
+  end
+
+  def test_a_block_given_to_define_method_is_asked_about_as_a_method_with_its_own_source
+    sandi_reads("lib/maker.rb", MAKER)
+    sources = ["define_method(:count) { |items| items.size }", "define_method(:total) do |items|\n  items.sum\nend",
+               "singleton_class.define_method(:zero) { 0 }"]
+    assert_equal(method_states(sources), states)
+  end
+
+  def test_define_method_given_a_block_to_pass_on_has_no_body_to_ask_about
+    sandi_reads("lib/copy.rb", PASSED_ON)
+    assert_empty states
   end
 
   def test_each_def_counts_even_beside_one_on_its_line_that_reads_the_same

@@ -26,6 +26,9 @@ module Sandi
     # Every node that stands alone in a body: of the file, a class, a method, a block, an if, and so on.
     def statements = @statements ||= nodes.select { |node| node.type == :statements_node }.flat_map(&:body)
 
+    # The nodes that make a method: a def, or a block given to define_method, which RuboCop's MethodLength counts too.
+    def method_nodes = @method_nodes ||= nodes.select { |node| node.type == :def_node || define_method?(node) }
+
     # The lines a node is on, with the text of a heredoc in it, which comes after the line that opens the heredoc and so
     # past where the node's own location ends.
     def span(node) = node.location.start_line..[node.location.end_line, *heredoc_ends(node)].max
@@ -33,6 +36,11 @@ module Sandi
     private
 
     def walk(node) = [node, *node.compact_child_nodes.flat_map { |child| walk(child) }]
+
+    # A call to define_method with a block to run. One passed a block with & has no body of its own to read.
+    def define_method?(node)
+      node.type == :call_node && node.name == :define_method && node.block.is_a?(Prism::BlockNode)
+    end
 
     def heredoc_ends(node)
       inside = heredocs.select { |heredoc| offsets(node).cover?(offsets(heredoc)) }

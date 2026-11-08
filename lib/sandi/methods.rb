@@ -3,10 +3,10 @@
 require_relative "source"
 
 module Sandi
-  # The methods in a file, each def with its own source, wherever it is defined: in a class or a module, in a block, in
-  # `class << self`, at the top of a script, or on a line with other code.
+  # The methods in a file, each def and each block given to define_method with its own source, wherever it is defined:
+  # in a class or a module, in a block, in `class << self`, at the top of a script, or on a line with other code.
   class Methods
-    # A def is where it starts, by line and column, since two can share a line.
+    # A method is where it starts, by line and column, since two can share a line.
     Method = Data.define(:file, :line, :column, :code) do
       # What Jev reads to answer a question about the method.
       def state = {"method" => code}
@@ -19,11 +19,10 @@ module Sandi
       @source = source
     end
 
-    def to_a = defs.map { |node| place(node) }
+    def to_a = @source.method_nodes.map { |node| place(node) }
 
     private
 
-    def defs = @source.nodes.select { |node| node.type == :def_node }
     def place(node) = Method.new(@source.file, node.location.start_line, node.location.start_column, code(node))
 
     # The def from its `def` to its `end`, as though it began its line: what shares a line with it is left out, and the

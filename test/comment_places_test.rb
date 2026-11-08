@@ -65,6 +65,11 @@ class CommentPlacesTest < SandiCase
     assert_equal [state("By kind.", source)], asked_in(source)
   end
 
+  def test_a_comment_inside_a_define_method_block_is_about_the_block
+    source = "class Maker\n  define_method(:total) do |items|\n    # Add them up.\n    items.sum\n  end\nend\n"
+    assert_equal [state("Add them up.", source.lines[1, 4].join)], asked_in(source)
+  end
+
   def test_a_comment_that_no_statement_holds_or_sits_above_is_not_asked_about
     assert_empty asked_in("require \"json\"\n\n# Nothing holds this.\n\nrequire \"yaml\"\n")
   end

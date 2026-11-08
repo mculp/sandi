@@ -6,10 +6,10 @@
 #   {"comment": "the comment's text", "code": "the definition or statement it is about, or the method it is in"}
 #
 # and one about a `trailing comment` is asked about each comment after code on its line, in the same state, with the
-# method it is in or the statement it follows as the code. A guideline `about: method` is asked about each def, with
-# its own source, as the state
+# method it is in or the statement it follows as the code. A guideline `about: method` is asked about each method, a
+# def or a block given to define_method, with its own source, as the state
 #
-#   {"method": "the def, from `def` to `end`, as though it began its line"}
+#   {"method": "the method, from `def` to `end`, as though it began its line"}
 #
 # Jev answers with a noul, the probability that the answer is yes. A yes counts against the file the place is in. A
 # project turns guidelines on by name in its .sandi.yml.

@@ -51,7 +51,7 @@ module Sandi
 
     # The innermost method the comment is in, which of all that hold it is the one to end first.
     def method_around(paragraph)
-      methods = definitions.select { |node| node.type == :def_node && around?(node, paragraph) }
+      methods = @source.method_nodes.select { |node| around?(node, paragraph) }
       methods.min_by { |node| node.location.end_line }
     end
 
